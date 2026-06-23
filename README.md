@@ -14,7 +14,7 @@ A GitHub personal access token was pasted in plaintext earlier in this project. 
 2. Issue a new one only if you actually need it (this project does **not** require a PAT to run).
 3. Make sure the old token appears nowhere in the files or git history you push.
 
-The app itself needs only an **API-Football key**, stored as an encrypted repository secret (below) — never committed to the code.
+The app itself needs **no keys or secrets at all** — match data comes from the public-domain openfootball dataset over plain HTTPS.
 
 ---
 
@@ -23,8 +23,8 @@ The app itself needs only an **API-Football key**, stored as an encrypted reposi
 | File | Purpose |
 |------|---------|
 | `index.html` | The entire app — HTML, CSS, JS, and an embedded `prediction-data` JSON block. Self-contained, no build step. |
-| `predict.py` | Fetches results, builds the model, runs the simulation, and injects fresh data into `index.html`. |
-| `requirements.txt` | Python dependency (`requests`). |
+| `predict.py` | Fetches results (openfootball), builds the model, runs the simulation, and injects fresh data into `index.html`. Standard library only. |
+| `requirements.txt` | No third-party deps (kept so the workflow's `pip install` step is a no-op). |
 | `.github/workflows/predict.yml` | Scheduled + manual GitHub Action that rebuilds and deploys the page. |
 
 The committed `index.html` ships with clearly-labelled **seed data** so the page looks right before the first live run.
@@ -36,7 +36,7 @@ The committed `index.html` ships with clearly-labelled **seed data** so the page
 - **Inputs:** Elo-style ratings, recent form (last ~10 matches), head-to-head history.
 - **Blend:** a weighted mix — Elo 45%, form 35%, head-to-head 20% (tunable in `predict.py` → `WEIGHTS`). No single signal is allowed to dominate.
 - **Simulation:** each tie's blended probability is played out across 10,000 simulated tournaments; a team's title odds = how often it wins across all runs.
-- **Data:** free match-result API (API-Football). No paid odds, no betting-market data.
+- **Data:** [openfootball/worldcup.json](https://github.com/openfootball/worldcup.json) — free, public-domain (CC0) match results and groups, **no API key required**. No paid odds, no betting-market data.
 - **Refresh:** every ~2 hours via the Action, plus a manual trigger.
 
 Probabilities, never asserted scorelines for unplayed games.
@@ -47,35 +47,25 @@ Probabilities, never asserted scorelines for unplayed games.
 
 1. **Rotate the leaked token** (see above). Don't skip this.
 2. **Create a new GitHub repo** and push these files (keep the structure, including `.github/workflows/`).
-3. **Get a free API-Football key** at <https://www.api-football.com/> (or the API-Sports dashboard).
-4. **Add the key as a secret:** repo → Settings → Secrets and variables → Actions → *New repository secret* → name `API_FOOTBALL_KEY`, paste the key.
-   - Optional repo *variables* if your provider's IDs differ: `WC_LEAGUE_ID` (default `1`), `WC_SEASON` (default `2026`).
-5. **Enable Pages:** repo → Settings → Pages → *Source: GitHub Actions*.
-6. **Run it once:** repo → Actions → *Refresh World Cup 2026 prediction* → *Run workflow*. When it finishes, your site is live at `https://<you>.github.io/<repo>/`.
+3. **Enable Pages:** repo → Settings → Pages → *Source: GitHub Actions*.
+4. **Run it once:** repo → Actions → *Refresh World Cup 2026 prediction* → *Run workflow*. When it finishes, your site is live at `https://<you>.github.io/<repo>/`.
 
-After that it updates itself on the 2-hourly schedule. The page's **Refresh** button reloads to pull the latest deployed build; to force a brand-new computation, hit *Run workflow* in the Actions tab.
+That's it — **no API key, no account, no secret to configure.** Data comes from the public-domain openfootball dataset. After the first run it updates itself on the 2-hourly schedule. The page's **Refresh** button reloads to pull the latest deployed build; to force a brand-new computation, hit *Run workflow* in the Actions tab.
 
 ---
 
 ## Run / test locally
 
-No API key needed — synthesised results drive a full offline build:
+No dependencies, no key — `predict.py` uses only the Python standard library.
 
 ```bash
-pip install -r requirements.txt
-python predict.py --sample            # rebuild index.html from synthesised results
-python predict.py --sample --dump data.json   # also write the computed DATA to data.json
+python predict.py                     # live: fetches openfootball, rebuilds index.html
+python predict.py --sample            # offline: synthesised results (no network)
+python predict.py --dump data.json    # also write the computed DATA to data.json
 open index.html                       # or just double-click it
 ```
 
-A live local run (uses your key, hits the API):
-
-```bash
-export API_FOOTBALL_KEY=your_key_here
-python predict.py
-```
-
-`--sample` runs leave the page's "illustrative seed data" banner on; a live run turns it off.
+`--sample` runs leave the page's "illustrative seed data" banner on; a live run turns it off. If openfootball is ever unreachable, the live run automatically falls back to synthesised seed data so the page still deploys.
 
 ---
 

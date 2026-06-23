@@ -40,10 +40,6 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build prediction (inject fresh data into index.html)
-        env:
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-          WC_LEAGUE_ID: ${{ vars.WC_LEAGUE_ID }}   # optional override (default 1)
-          WC_SEASON: ${{ vars.WC_SEASON }}         # optional override (default 2026)
         run: |
           python predict.py --out index.html
           mkdir -p _site
