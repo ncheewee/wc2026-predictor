@@ -160,6 +160,40 @@
   .empty{padding:46px 22px;text-align:center;color:var(--muted)}
   .empty .ei{font-size:30px;color:var(--faint);margin-bottom:10px}.empty b{color:var(--ink)}
 
+  /* betting */
+  .disc{font-size:12.5px;color:#ffd28a;border:1px solid rgba(255,180,80,.35);background:rgba(255,170,60,.07);
+    border-radius:12px;padding:12px 16px;margin-bottom:18px;line-height:1.55}
+  .disc b{color:#ffe0a8}
+  .betsrc{font-family:var(--mono);font-size:11px;color:var(--faint);margin:0 0 14px}
+  .betgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+  .bet{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;backdrop-filter:blur(10px)}
+  .bet.value{border-color:rgba(42,240,200,.5);box-shadow:0 0 14px rgba(42,240,200,.1)}
+  .bh{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:11px}
+  .bh b{font-weight:600}.bh .vs{color:var(--faint);font-size:12px}
+  .vchip{margin-left:auto;font-family:var(--disp);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    padding:4px 9px;border-radius:20px;font-weight:700;white-space:nowrap}
+  .vchip.value{color:var(--bg);background:var(--teal)}
+  .vchip.diverge{color:var(--amber);background:rgba(255,206,77,.12);border:1px solid rgba(255,206,77,.4)}
+  .vchip.agree{color:var(--muted);background:rgba(255,255,255,.05);border:1px solid var(--line)}
+  .o3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:10px}
+  .ob{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;padding:8px 6px;text-align:center}
+  .ob.pick{border-color:var(--teal);background:rgba(42,240,200,.08)}
+  .ob.mfav{border-color:rgba(73,182,255,.4)}
+  .ob .ol{font-size:10.5px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ob .ov{font-family:var(--disp);font-size:17px;font-weight:700;display:block;margin:2px 0}
+  .ob .om{font-size:10px;color:var(--faint);display:block}
+  .ob.pick .ov{color:var(--teal)}
+  .bn{font-size:12px;color:#bcd2ce;line-height:1.5}
+  .otable{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+  .otable th{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);
+    font-weight:400;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
+  .otable th.l{text-align:left}
+  .otable td{padding:9px 10px;text-align:right;border-bottom:1px solid rgba(80,220,200,.06);font-variant-numeric:tabular-nums}
+  .otable td.l{text-align:left;font-weight:500}
+  .otable .ev.value{color:var(--teal);font-weight:600}.otable .ev.lean{color:var(--lime)}.otable .ev.no-value{color:var(--muted)}
+  .legend2{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;margin:2px 0 14px}
+  .legend2 b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
   /* methodology */
   .flow{display:grid;grid-template-columns:repeat(3,1fr) .4fr 1fr;gap:10px;align-items:stretch;margin-bottom:30px}
   .fstep{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;backdrop-filter:blur(10px)}
@@ -209,6 +243,7 @@
     <button class="tab on" data-tab="overview">Overview</button>
     <button class="tab" data-tab="bracket">Bracket</button>
     <button class="tab" data-tab="data">Data</button>
+    <button class="tab" data-tab="betting">Betting</button>
     <button class="tab" data-tab="methodology">Methodology</button>
   </div>
 
@@ -217,6 +252,7 @@
   <section id="tab-overview"></section>
   <section id="tab-bracket" class="hide"></section>
   <section id="tab-data" class="hide"></section>
+  <section id="tab-betting" class="hide"></section>
   <section id="tab-methodology" class="hide"></section>
 
   <footer id="footer">Free match-result data · no betting-market inputs · auto-refresh every ~2 hours</footer>
@@ -334,26 +370,22 @@ function renderOverview(){
     <div class="panel">
       <div class="pt">Inference graph — signals → prediction<span class="tag">model: blend v1</span></div>
       <div class="net">
-        <svg viewBox="0 0 920 250" preserveAspectRatio="xMidYMid meet">
-          <path class="nlink pulse" stroke="#2af0c8" stroke-width="2" d="M150,55 C320,55 380,125 520,125" style="filter:drop-shadow(0 0 4px rgba(42,240,200,.6))"/>
-          <path class="nlink pulse" stroke="#2af0c8" stroke-width="2" d="M150,125 C320,125 380,125 520,125" style="animation-delay:.4s;filter:drop-shadow(0 0 4px rgba(42,240,200,.6))"/>
-          <path class="nlink pulse" stroke="#2af0c8" stroke-width="2" d="M150,195 C320,195 380,125 520,125" style="animation-delay:.8s;filter:drop-shadow(0 0 4px rgba(42,240,200,.6))"/>
-          <path class="nlink" stroke="rgba(73,182,255,.25)" stroke-width="1.4" d="M150,55 C300,55 360,195 520,195"/>
-          <path class="nlink" stroke="rgba(73,182,255,.25)" stroke-width="1.4" d="M150,195 C300,195 360,55 520,55"/>
-          <path class="nlink pulse" stroke="#2af0c8" stroke-width="2" d="M520,125 C650,125 700,125 800,125" style="animation-delay:1s;filter:drop-shadow(0 0 4px rgba(42,240,200,.6))"/>
-          <circle cx="150" cy="55" r="11" fill="#05080d" stroke="#49b6ff" stroke-width="2"/>
-          <circle cx="150" cy="125" r="11" fill="#05080d" stroke="#2af0c8" stroke-width="2"/>
-          <circle cx="150" cy="195" r="11" fill="#05080d" stroke="#a6f24d" stroke-width="2"/>
-          <text x="120" y="40" fill="#86a0a0" font-size="13" text-anchor="end" font-family="Inter,sans-serif">Elo rating</text>
-          <text x="120" y="130" fill="#86a0a0" font-size="13" text-anchor="end" font-family="Inter,sans-serif">Recent form</text>
-          <text x="120" y="218" fill="#86a0a0" font-size="13" text-anchor="end" font-family="Inter,sans-serif">Head-to-head</text>
-          <circle cx="520" cy="55" r="9" fill="#05080d" stroke="rgba(120,160,160,.5)" stroke-width="1.5"/>
-          <circle cx="520" cy="125" r="14" fill="#0c2a26" stroke="#2af0c8" stroke-width="2"/>
-          <circle cx="520" cy="195" r="9" fill="#05080d" stroke="rgba(120,160,160,.5)" stroke-width="1.5"/>
-          <text x="520" y="236" fill="#5a7373" font-size="11" text-anchor="middle" font-family="Inter,sans-serif">blend layer</text>
-          <circle cx="800" cy="125" r="22" fill="#0c2a26" stroke="#2af0c8" stroke-width="2.5" style="filter:drop-shadow(0 0 10px rgba(42,240,200,.6))"/>
-          <text x="800" y="130" fill="#2af0c8" font-size="13" font-weight="700" text-anchor="middle" font-family="Chakra Petch,sans-serif">${esc(c.team.slice(0,2).toUpperCase())}</text>
-          <text x="800" y="168" fill="#86a0a0" font-size="11" text-anchor="middle" font-family="Inter,sans-serif">champion</text>
+        <svg viewBox="0 0 920 240" preserveAspectRatio="xMidYMid meet">
+          <path class="nlink pulse" stroke="#2af0c8" stroke-width="2" d="M150,50 C330,50 430,120 516,120" style="filter:drop-shadow(0 0 4px rgba(42,240,200,.6))"/>
+          <path class="nlink pulse" stroke="#2af0c8" stroke-width="2" d="M150,120 C330,120 430,120 516,120" style="animation-delay:.45s;filter:drop-shadow(0 0 4px rgba(42,240,200,.6))"/>
+          <path class="nlink pulse" stroke="#2af0c8" stroke-width="2" d="M150,190 C330,190 430,120 516,120" style="animation-delay:.9s;filter:drop-shadow(0 0 4px rgba(42,240,200,.6))"/>
+          <path class="nlink pulse" stroke="#2af0c8" stroke-width="2" d="M524,120 C640,120 700,120 778,120" style="animation-delay:1.2s;filter:drop-shadow(0 0 5px rgba(42,240,200,.6))"/>
+          <circle cx="150" cy="50" r="11" fill="#05080d" stroke="#49b6ff" stroke-width="2"/>
+          <circle cx="150" cy="120" r="11" fill="#05080d" stroke="#2af0c8" stroke-width="2"/>
+          <circle cx="150" cy="190" r="11" fill="#05080d" stroke="#a6f24d" stroke-width="2"/>
+          <text x="120" y="36" fill="#86a0a0" font-size="13" text-anchor="end" font-family="Inter,sans-serif">Elo rating</text>
+          <text x="120" y="125" fill="#86a0a0" font-size="13" text-anchor="end" font-family="Inter,sans-serif">Recent form</text>
+          <text x="120" y="213" fill="#86a0a0" font-size="13" text-anchor="end" font-family="Inter,sans-serif">Head-to-head</text>
+          <circle cx="520" cy="120" r="17" fill="#0c2a26" stroke="#2af0c8" stroke-width="2.5" style="filter:drop-shadow(0 0 9px rgba(42,240,200,.45))"/>
+          <text x="520" y="160" fill="#5a7373" font-size="11" text-anchor="middle" font-family="Inter,sans-serif">blend</text>
+          <circle cx="800" cy="120" r="22" fill="#0c2a26" stroke="#2af0c8" stroke-width="2.5" style="filter:drop-shadow(0 0 10px rgba(42,240,200,.6))"/>
+          <text x="800" y="125" fill="#2af0c8" font-size="13" font-weight="700" text-anchor="middle" font-family="Chakra Petch,sans-serif">${esc(c.team.slice(0,2).toUpperCase())}</text>
+          <text x="800" y="162" fill="#86a0a0" font-size="11" text-anchor="middle" font-family="Inter,sans-serif">champion</text>
         </svg>
       </div>
       <div class="out">
@@ -523,10 +555,52 @@ function renderMethodology(){
     </div>`;
 }
 
+/* BETTING */
+function renderBetting(){
+  const B = DATA.betting;
+  const el = document.getElementById('tab-betting');
+  if(!B){ el.innerHTML = `<div class="panel"><div class="empty"><div class="ei">◌</div>
+    <p><b>Odds load on the first live build.</b></p>
+    <p>The betting view populates from Singapore Pools odds once the GitHub Action runs.</p></div></div>`; return; }
+  const chip = {value:'Value', diverge:'Model differs', agree:'In line'};
+  const card = m => {
+    const picksel = m.lean ? ({'1':0,'X':1,'2':2})[m.lean.sel] : -1;
+    const box = (i,label)=>{
+      const cls = (i===picksel?'pick':'') + (label===m.marketFav?' mfav':'');
+      return `<div class="ob ${cls}"><span class="ol">${esc(label)}</span><span class="ov">${m.odds[i]}</span><span class="om">model ${m.model[i]}%</span></div>`;
+    };
+    const chiptxt = m.label==='value' ? ('Value +'+m.lean.edge+'%') : chip[m.label];
+    return `<div class="bet ${m.label}">
+      <div class="bh"><b>${esc(m.a)}</b><span class="vs">vs</span><b>${esc(m.b)}</b><span class="vchip ${m.label}">${chiptxt}</span></div>
+      <div class="o3">${box(0,m.a)}${box(1,'Draw')}${box(2,m.b)}</div>
+      <div class="bn">${esc(m.note)}</div></div>`;
+  };
+  const matches = B.matches && B.matches.length
+    ? `<div class="betgrid">${B.matches.map(card).join('')}</div>`
+    : `<div class="panel"><div class="empty"><div class="ei">◌</div><p><b>No open match odds right now.</b></p>
+       <p>Singapore Pools 1X2 odds appear here when upcoming fixtures are available.</p></div></div>`;
+  const orow = o => `<tr><td class="l">${esc(o.team)}</td><td>${o.modelProb}%</td>
+    <td>${o.fairOdds??'—'}</td><td>${o.marketOdds??'—'}</td>
+    <td class="ev ${o.label||''}">${o.edge==null?'—':((o.edge>=0?'+':'')+o.edge+'%')}</td></tr>`;
+  el.innerHTML = `
+    <div class="disc"><b>⚠ Not betting advice.</b> ${esc(B.disclaimer)}</div>
+    <p class="betsrc">Odds: ${esc(B.source)} · updated ${esc(B.oddsUpdated)}</p>
+    <h2 class="sec">Upcoming matches — model vs market</h2>
+    <div class="legend2"><span><b style="background:var(--teal)"></b>Model sees a small edge</span>
+      <span><b style="background:var(--amber)"></b>Model differs from market</span>
+      <span><b style="background:#3a5560"></b>In line with market</span></div>
+    ${matches}
+    <h2 class="sec">Outright winner — model vs market</h2>
+    <p class="betsrc">Market column: ${esc(B.outrightNote)}. Fair odds = 1 ÷ model probability.</p>
+    <div class="panel" style="padding:4px 12px 10px">
+      <table class="otable"><thead><tr><th class="l">Team</th><th>Model</th><th>Fair odds</th><th>Market</th><th>Edge</th></tr></thead>
+      <tbody>${B.outright.map(orow).join('')}</tbody></table></div>`;
+}
+
 /* tabs */
 function show(tab){
   document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===tab));
-  ['overview','bracket','data','methodology'].forEach(t=>{
+  ['overview','bracket','data','betting','methodology'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hide',t!==tab);
   });
   window.scrollTo({top:0,behavior:'smooth'});
@@ -539,7 +613,7 @@ document.addEventListener('click',e=>{
 });
 document.getElementById('refresh').addEventListener('click',()=>location.reload());
 
-renderOverview(); renderBracket(); renderData(); renderMethodology();
+renderOverview(); renderBracket(); renderData(); renderBetting(); renderMethodology();
 </script>
 </body>
 </html>

@@ -42,6 +42,21 @@ OF_BASE = "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2
 OF_MATCHES = OF_BASE + "/worldcup.json"
 OF_GROUPS  = OF_BASE + "/worldcup.groups.json"
 
+# Odds: Singapore Pools 1X2 odds, mirrored in scrapable HTML by sgodds.com.
+ODDS_URL = "https://sgodds.com/football/current-odds"
+ODDS_VALUE_EDGE = 0.05    # EV per $1 above which we flag "value"
+# sgodds team names -> our (openfootball) names
+ODDS_ALIAS = {"Holland":"Netherlands","Korea Republic":"South Korea","Czechia":"Czech Republic",
+              "Congo DR":"DR Congo","Turkiye":"Turkey","Bosnia":"Bosnia and Herzegovina"}
+# Outright "winner" odds CANNOT be auto-scraped (Singapore Pools' outrights page is
+# JavaScript-only). Maintain a manual reference here to enable outright value analysis.
+# Decimal odds; edit/update as needed. Empty -> outright shows model fair-odds only.
+OUTRIGHT_ODDS = {  # reference snapshot — update from Singapore Pools as desired
+    "Spain":6.50, "France":5.50, "England":9.00, "Argentina":7.50, "Brazil":9.00,
+    "Portugal":13.0, "Germany":15.0, "Netherlands":15.0,
+}
+OUTRIGHT_AS_OF = "reference snapshot — edit OUTRIGHT_ODDS in predict.py"
+
 # Elo priors (refined by results as they arrive). Unknown teams default to DEFAULT_ELO.
 BASE_ELO = {
     "Argentina":2090,"France":2065,"Spain":2055,"England":2010,"Brazil":2000,
@@ -84,6 +99,96 @@ def _get_json(url):
     req = urllib.request.Request(url, headers={"User-Agent": "wc2026-prediction-net"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
+
+def _get_text(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (wc2026-prediction-net)"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return r.read().decode("utf-8", "replace")
+
+def fetch_odds():
+    """Scrape Singapore Pools 1X2 odds (via sgodds.com). Returns (fixtures, updated)."""
+    try:
+        h = _get_text(ODDS_URL)
+    except Exception as e:
+        print("[odds] fetch failed:", e); return [], None
+    fixtures = []
+    for row in re.split(r'<div class="row border-bottom', h):
+        if "W Cup" not in row:
+            continue
+        m = re.search(r'current-odds/[^"]*"[^>]*>([^<]+)</a>', row)
+        if not m or " vs " not in m.group(1):
+            continue
+        a, b = [ODDS_ALIAS.get(x.strip(), x.strip()) for x in m.group(1).split(" vs ")]
+        od = re.findall(r'<strong>([\d.]+)</strong>', row)[:3]
+        if len(od) != 3:
+            continue
+        fixtures.append((a, b, [float(x) for x in od]))
+    upd = re.search(r'Last Updated on ([\d:\- ]+)', h)
+    print(f"[odds] sgodds W-Cup fixtures parsed: {len(fixtures)}")
+    return fixtures, (upd.group(1).strip() if upd else None)
+
+def compute_betting(fixtures, updated, elo, form, h2h, teamset, title_odds):
+    """Compare model probabilities to Singapore Pools odds; flag value (positive EV)."""
+    def lab(edge):  # edge as a fraction
+        return "value" if edge >= ODDS_VALUE_EDGE else ("lean" if edge >= 0 else "no-value")
+    matches = []
+    for a, b, o in fixtures:
+        if a not in teamset or b not in teamset:
+            continue
+        names = {0: a, 1: "Draw", 2: b}
+        p = match_prob(a, b, elo, form, h2h)           # P(a wins, binary)
+        pX = max(0.12, min(0.30, 0.30 - 0.16*abs(2*p-1)))
+        model = [p*(1-pX), pX, (1-p)*(1-pX)]           # [home, draw, away]
+        imp = [1/o[0], 1/o[1], 1/o[2]]; s = sum(imp)
+        fair = [i/s for i in imp]                       # de-vigged market probs
+        ev = [model[i]*o[i]-1 for i in range(3)]        # EV per $1 staked
+        mkt_fav, mdl_fav = min(range(3), key=lambda i: o[i]), max(range(3), key=lambda i: model[i])
+        agree = mkt_fav == mdl_fav
+        # A "lean" only counts when it's a plausible price (not a longshot the model
+        # can't be trusted on) and the edge is in a sane band — this is a toy model,
+        # the market is usually sharper, so we deliberately suppress longshot blow-ups.
+        cand = [i for i in range(3) if o[i] <= 4.0]
+        lean = None
+        if cand:
+            bi = max(cand, key=lambda i: ev[i])
+            if 0.05 <= ev[bi] <= 0.40:
+                lean = {"sel": ["1","X","2"][bi], "name": names[bi],
+                        "edge": round(ev[bi]*100,1),
+                        "modelPct": round(model[bi]*100), "marketPct": round(fair[bi]*100)}
+        if lean:
+            label = "value"; rank = 0
+            note = (f"Model rates {lean['name']} higher than the market "
+                    f"({lean['modelPct']}% vs {lean['marketPct']}%) — a small +{lean['edge']}% edge.")
+        elif agree:
+            label = "agree"; rank = 2
+            note = f"Model agrees with the market favourite, {names[mkt_fav]}."
+        else:
+            label = "diverge"; rank = 1
+            note = (f"Model leans {names[mdl_fav]} but the market favours {names[mkt_fav]} — "
+                    "no betting edge, treat as model uncertainty.")
+        matches.append({"a": a, "b": b, "odds": [round(x,2) for x in o],
+                        "model": [round(x*100) for x in model],
+                        "marketFav": names[mkt_fav], "modelFav": names[mdl_fav],
+                        "lean": lean, "label": label, "note": note, "_rank": rank})
+    matches.sort(key=lambda m: (m["_rank"], -(m["lean"]["edge"] if m["lean"] else 0)))
+    for m in matches: m.pop("_rank", None)
+    outright = []
+    for team, prob in sorted(title_odds.items(), key=lambda kv: kv[1], reverse=True)[:8]:
+        mk = OUTRIGHT_ODDS.get(team)
+        edge = (prob*mk-1) if mk else None
+        outright.append({"team": team, "modelProb": round(prob*100,1),
+                         "fairOdds": round(1/prob,2) if prob > 0 else None,
+                         "marketOdds": mk, "edge": round(edge*100,1) if edge is not None else None,
+                         "label": (lab(edge) if edge is not None else None)})
+    return {
+        "oddsUpdated": updated or "—",
+        "source": "Singapore Pools (via sgodds.com)",
+        "matches": matches, "outright": outright, "outrightNote": OUTRIGHT_AS_OF,
+        "disclaimer": ("For analysis and entertainment only — not betting advice. Odds move "
+                       "constantly; always verify on Singapore Pools before acting. Sports betting "
+                       "in Singapore is 21+ and legal only via Singapore Pools. If gambling may be "
+                       "affecting you, call the National Problem Gambling Helpline 1800-6-668-668."),
+    }
 
 def groups_as_list(groups_dict):
     """[{'name':'Group A','teams':[...]}] -> [('A',[...]), ...] ordered."""
@@ -179,10 +284,17 @@ def match_prob(a,b,elo,form,h2h):
     ra=elo[a]+(35 if a in HOME_TEAMS else 0)
     rb=elo[b]+(35 if b in HOME_TEAMS else 0)
     p_elo=1/(1+10**((rb-ra)/400))
-    fa,fb=form_prob(a,form),form_prob(b,form)
-    p_form=fa/(fa+fb)
-    p_h2h=h2h_prob(a,b,h2h)
-    p=WEIGHTS["elo"]*p_elo+WEIGHTS["form"]*p_form+WEIGHTS["h2h"]*p_h2h
+    # Only fold in form/H2H when there's actual data, and renormalise the weights so
+    # missing signals don't drag every match toward a 50/50 coin flip.
+    comps=[(WEIGHTS["elo"], p_elo)]
+    if len(form.get(a,[]))>=2 and len(form.get(b,[]))>=2:
+        fa,fb=form_prob(a,form),form_prob(b,form)
+        comps.append((WEIGHTS["form"], fa/(fa+fb)))
+    key=(a,b) if a<b else (b,a)
+    if h2h.get(key) and sum(h2h[key])>0:
+        comps.append((WEIGHTS["h2h"], h2h_prob(a,b,h2h)))
+    wsum=sum(w for w,_ in comps)
+    p=sum(w*v for w,v in comps)/wsum
     return min(0.99,max(0.01,p))
 
 # ----------------------------------------------------------------------------- standings + bracket
@@ -272,12 +384,13 @@ def build_bracket_view(r32,elo,form,h2h,fav):
     return rounds
 
 # ----------------------------------------------------------------------------- assemble + inject
-def assemble(matches, groups, live):
+def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
     teams=[t for _,ts in groups for t in ts]
     elo,form,h2h,feed=build_signals(matches,teams)
     stand=standings(matches,groups)
     r32=build_bracket_seed(stand,elo)
     odds=monte_carlo(r32,elo,form,h2h)
+    betting=compute_betting(odds_fixtures or [], odds_updated, elo, form, h2h, set(teams), odds)
     ranked=sorted(odds.items(),key=lambda kv:kv[1],reverse=True)
     fav,path=projected_path(r32,elo,form,h2h)
     champ_team,champ_prob=ranked[0][0],round(ranked[0][1]*100,1)
@@ -318,7 +431,7 @@ def assemble(matches, groups, live):
                 "eloThrough":f"{gp+kp} matches ingested",
                 "checks":["fixtures + groups fetched","scores parsed","form window = last 10",
                           "H2H records linked","ratings recomputed after each result","next auto-sync ~2h"]},
-      "groups":stand,"results":results,
+      "groups":stand,"results":results,"betting":betting,
     }
 
 def inject(html_path, data):
@@ -336,6 +449,7 @@ def main():
     ap.add_argument("--dump")
     args=ap.parse_args()
     assert abs(sum(WEIGHTS.values())-1.0)<1e-9,"weights must sum to 1"
+    odds_fixtures, odds_updated = [], None
     if args.sample:
         matches,groups=synth_sample(); live=False
     else:
@@ -345,7 +459,8 @@ def main():
             matches,groups=synth_sample(); live=False
         else:
             matches,groups=res; live=True
-    data=assemble(matches,groups,live)
+            odds_fixtures, odds_updated = fetch_odds()
+    data=assemble(matches,groups,live,odds_fixtures,odds_updated)
     if args.dump: json.dump(data,open(args.dump,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
     inject(args.out,data)
     print(f"OK · champion {data['champion']['team']} {data['champion']['prob']}% · "

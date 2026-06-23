@@ -2,7 +2,11 @@
 
 A single-page, self-contained web app that predicts who will win the 2026 World Cup. It blends three simple models — Elo rating, recent form, and head-to-head history — and runs a Monte Carlo simulation (10,000 tournaments per refresh) to turn them into probabilities. Hosted free on GitHub Pages; predictions refresh automatically every ~2 hours via a scheduled GitHub Action as real results come in.
 
-Four tabs: **Overview** (predicted champion, confidence, the path to the final, plain-language reasoning), **Bracket** (projected knockout tree with per-tie win probabilities), **Data** (ingestion status, every group standing, and a result feed showing how each match moved the ratings — your verification view), and **Methodology** (how it works and where it can be wrong).
+Five tabs: **Overview** (predicted champion, confidence, the path to the final, plain-language reasoning), **Bracket** (projected knockout tree with per-tie win probabilities), **Data** (ingestion status, every group standing, and a result feed showing how each match moved the ratings — your verification view), **Betting** (Singapore Pools 1X2 odds for upcoming matches compared against the model, with a measured value/edge read), and **Methodology** (how it works and where it can be wrong).
+
+### Betting tab — read this
+
+The Betting tab is a **model-vs-market comparison for information only — not betting advice.** It pulls Singapore Pools 1X2 odds (mirrored by [sgodds.com](https://sgodds.com), since Singapore Pools' own odds page is JavaScript-only and can't be scraped in CI), converts them to implied probabilities, and shows where the model's probability differs. It deliberately suppresses longshot "value" blow-ups (a simple Elo model is *not* as sharp as the market) and caps/filters edges, so a flagged "value" lean is modest by design. **Outright winner** odds can't be auto-scraped, so the market column there is a manual reference in `predict.py` (`OUTRIGHT_ODDS`) — edit it to keep it current. Betting in Singapore is 21+ and legal only via Singapore Pools; if gambling may be affecting you, call the National Problem Gambling Helpline 1800-6-668-668.
 
 ---
 
