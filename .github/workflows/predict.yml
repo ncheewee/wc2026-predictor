@@ -1,0 +1,59 @@
+name: Refresh World Cup 2026 prediction
+
+# Rebuilds index.html with fresh predictions and deploys it to GitHub Pages.
+# Runs every ~2 hours, and can be triggered manually from the Actions tab.
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"   # every 2 hours (UTC; GitHub may delay under load)
+  workflow_dispatch: {}      # manual "refresh now"
+  push:
+    branches: [main]         # redeploy on code changes
+
+# Least-privilege permissions for the Pages deployment flow
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one deployment at a time; don't pile up queued runs
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build prediction (inject fresh data into index.html)
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          WC_LEAGUE_ID: ${{ vars.WC_LEAGUE_ID }}   # optional override (default 1)
+          WC_SEASON: ${{ vars.WC_SEASON }}         # optional override (default 2026)
+        run: |
+          python predict.py --out index.html
+          mkdir -p _site
+          cp index.html _site/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+_site/
+build_test.html
+built_data.json
+uat*.png
+data.json
