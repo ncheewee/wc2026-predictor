@@ -73,14 +73,40 @@ def fetch_live():
     key = os.environ.get("API_FOOTBALL_KEY")
     if not key:
         return None  # caller falls back to seed data so the page still deploys
-    season = os.environ.get("WC_SEASON", "2026")
-    league = os.environ.get("WC_LEAGUE_ID", "1")  # 1 = FIFA World Cup on API-Football
-    url = "https://v3.football.api-sports.io/fixtures"
-    r = requests.get(url, headers={"x-apisports-key": key},
-                     params={"league": league, "season": season}, timeout=30)
-    r.raise_for_status()
+    # NB: use `or` not get(...,default) — the workflow passes these as EMPTY strings
+    # when the repo variables are unset, which would override a default of "".
+    season = os.environ.get("WC_SEASON") or "2026"
+    league = os.environ.get("WC_LEAGUE_ID") or "1"   # 1 = FIFA World Cup on API-Football
+    base = "https://v3.football.api-sports.io"
+    H = {"x-apisports-key": key}
+    def get(path, **params):
+        r = requests.get(base+path, headers=H, params=params, timeout=30)
+        r.raise_for_status()
+        return r.json()
+
+    j = get("/fixtures", league=league, season=season)
+    print(f"[api] /fixtures league={league} season={season} -> "
+          f"results={j.get('results')} errors={j.get('errors')} paging={j.get('paging')}")
+    resp = list(j.get("response", []))
+    paging = j.get("paging") or {}
+    cur, total = paging.get("current", 1) or 1, paging.get("total", 1) or 1
+    while cur < total:
+        cur += 1
+        resp += get("/fixtures", league=league, season=season, page=cur).get("response", [])
+
+    if not resp:
+        # Discovery: surface the real World Cup league id + the seasons this key can see.
+        try:
+            lj = get("/leagues", search="world cup")
+            for x in lj.get("response", [])[:8]:
+                yrs = [s.get("year") for s in x.get("seasons", [])]
+                print(f"[api] league id={x['league']['id']} '{x['league']['name']}' "
+                      f"type={x['league'].get('type')} seasons={yrs[-6:]}")
+        except Exception as e:
+            print("[api] league discovery failed:", e)
+
     out = []
-    for fx in r.json().get("response", []):
+    for fx in resp:
         if fx["fixture"]["status"]["short"] != "FT":
             continue
         out.append({
@@ -90,6 +116,7 @@ def fetch_live():
             "hg": fx["goals"]["home"], "ag": fx["goals"]["away"],
             "stage": fx["league"].get("round", "Group Stage"),
         })
+    print(f"[api] finished(FT) fixtures used: {len(out)} of {len(resp)} returned")
     return out
 
 def synth_sample(seed=20260623):
