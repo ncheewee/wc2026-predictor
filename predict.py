@@ -307,16 +307,30 @@ def h2h_prob(a,b,h2h):
     share=(aw+0.5*dr)/total if a<b else (bw+0.5*dr)/total
     return 0.5 + (share-0.5)*0.7
 
-def draw_prob(p):
-    """Draw likelihood from the binary win prob p. Peaks (~0.36) for evenly-matched
-    sides so 'Draw' can genuinely be the most-likely outcome in tight games, and falls
-    toward 0.10 for mismatches. A simple heuristic, not a goals model."""
-    return max(0.10, min(0.36, 0.36 - 0.26*abs(2*p-1)))
+TOTAL_GOALS = 2.6   # baseline expected goals in a tie (typical for international football)
 
 def one_x_two(p):
-    """Return [home, draw, away] probabilities from binary win prob p."""
-    px = draw_prob(p)
-    return [p*(1-px), px, (1-p)*(1-px)]
+    """Proper 1·X·2 via a Poisson goals model. Convert the blended binary win prob p
+    into a goal supremacy, split into expected goals per side, then sum the Poisson
+    score matrix into P(home), P(draw), P(away). Gives realistic draw probabilities
+    (~25-30% in even games) rather than a hand-tuned cap."""
+    p = min(0.99, max(0.01, p))
+    d_eff = 400*math.log10(p/(1-p))            # effective Elo gap implied by p
+    S = max(-2.5, min(2.5, d_eff/130.0))       # goal supremacy (home minus away), capped
+    la = max(0.2, (TOTAL_GOALS+S)/2)
+    lb = max(0.2, (TOTAL_GOALS-S)/2)
+    N = 8
+    pa = [math.exp(-la)*la**i/math.factorial(i) for i in range(N+1)]
+    pb = [math.exp(-lb)*lb**j/math.factorial(j) for j in range(N+1)]
+    ph=pd=pw=0.0
+    for i in range(N+1):
+        for j in range(N+1):
+            pr = pa[i]*pb[j]
+            if i>j: ph+=pr
+            elif i==j: pd+=pr
+            else: pw+=pr
+    s = ph+pd+pw
+    return [ph/s, pd/s, pw/s]
 
 def match_prob(a,b,elo,form,h2h):
     ra=elo[a]+(35 if a in HOME_TEAMS else 0)
@@ -444,6 +458,16 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
     draws={"actual":sum(1 for x in log if x["result"]=="Draw"),
            "pred":sum(1 for x in log if x["pred"]=="Draw"),
            "correct":sum(1 for x in log if x["pred"]=="Draw" and x["correct"])}
+    # accuracy by actual outcome type (home win / draw / away win)
+    def otype(x):
+        if x["result"]=="Draw": return "draw"
+        return "home" if x["result"]==x["a"] else "away"
+    _agg={"home":[0,0],"draw":[0,0],"away":[0,0]}
+    for x in log:
+        t=otype(x); _agg[t][0]+=1; _agg[t][1]+= 1 if x["correct"] else 0
+    _lbl={"home":"Home wins","draw":"Draws","away":"Away wins"}
+    by_outcome=[{"type":k,"label":_lbl[k],"total":_agg[k][0],"correct":_agg[k][1],
+                 "pct":round(_agg[k][1]/_agg[k][0]*100) if _agg[k][0] else 0} for k in ("home","draw","away")]
     # ---- title-odds evolution: re-simulate each rating snapshot ----
     evolution=[]
     for label,snap in snaps:
@@ -512,6 +536,7 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
       "groups":stand,"results":results,"betting":betting,
       "championProgress":progress,
       "performance":{"accuracy":accuracy,"correct":correct,"total":total,"draws":draws,
+                     "byOutcome":by_outcome,
                      "matches":perf_matches,"evolution":evolution,"champion":champ_team},
     }
 

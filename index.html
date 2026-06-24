@@ -201,6 +201,7 @@
   .metric .mv{font-family:var(--disp);font-size:30px;font-weight:700;color:var(--teal);line-height:1}
   .metric .mv small{font-size:14px;color:var(--muted)}
   .metric .ms{font-size:12px;color:var(--muted);margin-top:6px}
+  .obreak{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .evo{padding:18px 22px}
   .evo svg{width:100%;height:auto;display:block;overflow:visible}
   .evosum{font-size:13px;color:#bcd2ce;line-height:1.6;margin:12px 0 0}
@@ -690,6 +691,11 @@ function renderScorecard(){
       <div class="metric"><div class="ml">Predicted champion</div><div class="mv" style="font-size:21px">${esc(P.champion)}</div><div class="ms">${top3.length?('now '+top3[0].prob+'% to win'):''}</div></div>
     </div>
     ${P.draws?`<p class="betsrc" style="margin:-6px 0 16px">Outcomes are 1 · X · 2 — <b style="color:var(--muted)">draws are predicted too</b>. So far ${P.draws.actual} matches were drawn; the model called ${P.draws.correct} of them (draws are the hardest outcome for any model).</p>`:''}
+    ${P.byOutcome?`<div class="panel" style="padding:16px 20px;margin-bottom:18px">
+      <div class="pt" style="border:none;padding:0 0 12px">Accuracy by outcome<span class="tag">by actual result</span></div>
+      <div class="obreak">${P.byOutcome.map(o=>`<div class="cstat"><div class="cl">${esc(o.label)}</div>
+        <div class="cvv">${o.pct}<span style="font-size:13px;color:var(--muted)">%</span></div>
+        <div class="cl" style="margin:6px 0 0;text-transform:none;letter-spacing:0">${o.correct}/${o.total} called</div></div>`).join('')}</div></div>`:''}
     <div class="panel evo">
       <div class="pt" style="padding:0 0 12px;border:none">Title race — predicted champion's odds over time<span class="tag">${esc(P.champion)}</span></div>
       ${spark}
