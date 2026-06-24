@@ -206,14 +206,14 @@
   .evo svg{width:100%;height:auto;display:block;overflow:visible}
   .evosum{font-size:13px;color:#bcd2ce;line-height:1.6;margin:12px 0 0}
   .evosum b{color:var(--teal)}
-  .sctable{width:100%;border-collapse:collapse;font-size:13px}
+  .sctable{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
   .sctable th{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:400;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-  .sctable th.r,.sctable td.r{text-align:right}
   .sctable th.c,.sctable td.c{text-align:center}
-  .sctable td{padding:9px 10px;border-bottom:1px solid rgba(80,220,200,.06)}
+  .sctable td{padding:9px 10px;border-bottom:1px solid rgba(80,220,200,.06);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;text-align:left}
   .sctable .fix{font-weight:500}
   .sctable .sc-pred{color:var(--muted)}
-  .sctable .res{font-family:var(--disp);font-weight:700}
+  .sctable .res{display:inline;font-family:var(--disp);font-weight:700;margin-right:6px}
+  .sctable .rname{color:var(--muted);font-size:12px}
   .verdict{font-family:var(--disp);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
   .verdict.ok{color:var(--bg);background:var(--teal)}
   .verdict.no{color:var(--red);background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.4)}
@@ -682,7 +682,7 @@ function renderScorecard(){
     <td>${esc(m.date)}</td>
     <td class="fix">${esc(m.a)} <span style="color:var(--faint)">v</span> ${esc(m.b)}</td>
     <td class="sc-pred">${esc(m.pred)} · ${m.conf}%</td>
-    <td><span class="res">${esc(m.score)}</span> <span style="color:var(--muted)">${esc(m.result)}</span></td>
+    <td><span class="res">${esc(m.score)}</span><span class="rname">${esc(m.result)}</span></td>
     <td class="c"><span class="verdict ${m.correct?'ok':'no'}">${m.correct?'✓':'✗'}</span></td></tr>`).join('');
   el.innerHTML=`
     <div class="metrics">
@@ -704,7 +704,9 @@ function renderScorecard(){
     <h2 class="sec">Every prediction vs result</h2>
     <p class="betsrc">Graded the moment each match finishes — newest first. "Correct" = the model's most-likely outcome matched the actual 1·X·2 result.</p>
     <div class="panel" style="padding:4px 10px 8px">
-      <table class="sctable"><thead><tr><th>Date</th><th>Match</th><th>Model pick</th><th>Result</th><th class="c">Call</th></tr></thead>
+      <table class="sctable">
+      <colgroup><col style="width:13%"><col style="width:33%"><col style="width:24%"><col style="width:20%"><col style="width:10%"></colgroup>
+      <thead><tr><th>Date</th><th>Match</th><th>Model pick</th><th>Result</th><th class="c">Call</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`;
 }
 
