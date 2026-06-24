@@ -198,6 +198,13 @@
   .bdstats{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted);margin-bottom:10px}
   .bdstats b{color:var(--ink);font-weight:500}
   .bdnote{font-size:12.5px;color:#bcd2ce;line-height:1.55;margin:0}
+  .bet .more{color:var(--teal);font-size:11px;margin-left:6px;white-space:nowrap}
+  .modal-bg{position:fixed;inset:0;background:rgba(3,6,12,.74);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .modal-bg.open{display:flex}
+  .modal{background:linear-gradient(180deg,#0e1626,#0b1120);border:1px solid var(--line);border-radius:16px;max-width:520px;width:100%;max-height:86vh;overflow:auto;padding:22px 24px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .modal .mclose{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+  .modal .mh{font-family:var(--disp);font-size:18px;font-weight:700;margin:0 0 4px;padding-right:30px}
+  .modal .msub{font-size:12.5px;color:var(--teal);margin:0 0 16px}
   .otable{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
   .otable th{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);
     font-weight:400;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
@@ -628,7 +635,23 @@ function renderBetting(){
     <p>The betting view populates from Singapore Pools odds once the GitHub Action runs.</p></div></div>`; return; }
   const chip = {value:'Value', diverge:'Model differs', agree:'In line'};
   const stars = n => '★'.repeat(n)+'☆'.repeat(3-n);
-  const card = m => {
+  const detailHTML = m => {
+    const rows = [[m.a,0],['Draw',1],[m.b,2]].map(([lab,i])=>
+      `<tr><td class="l">${esc(lab)}</td><td>${m.odds[i]}</td><td>${m.mktImplied[i]}%</td><td>${m.model[i]}%</td><td class="${i===m.pickIdx?'hl':''}">${m.adj[i]}%</td></tr>`).join('');
+    const sub = m.label==='value'
+      ? `Value on ${esc(m.pick)} · ${stars(m.stars)} · adj edge +${m.edge}%`
+      : (m.label==='diverge' ? `Model leans ${esc(m.modelFav)}; market likes ${esc(m.marketFav)}` : `In line with the market (${esc(m.marketFav)})`);
+    return `<p class="mh">${esc(m.a)} vs ${esc(m.b)}</p><p class="msub">${sub}</p>
+      <table class="bdtab"><colgroup><col style="width:34%"><col style="width:16%"><col style="width:18%"><col style="width:16%"><col style="width:16%"></colgroup>
+        <thead><tr><th class="l">Outcome</th><th>Odds</th><th>Market</th><th>Model</th><th>Adj</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="bdstats">
+        <span><b>${esc(m.a)}</b> · form ${esc(m.formA)} · Elo ${m.eloA}</span>
+        <span><b>${esc(m.b)}</b> · form ${esc(m.formB)} · Elo ${m.eloB}</span>
+        <span>Head-to-head: ${esc(m.h2h)}</span></div>
+      <p class="bdnote">${esc(m.note)}${m.label==='value'?` <b style="color:var(--teal)">Conviction ${stars(m.stars)}</b> — Kelly stake ${m.conv}% of bank · raw edge +${m.rawEdge}%.`:''}
+      <br><span style="color:var(--faint);font-size:11px">Market = de-vigged implied probability · Model = raw model · Adj = after shrinking to market by earned trust.</span></p>`;
+  };
+  const card = (m,idx) => {
     const picksel = m.stars>0 ? m.pickIdx : -1;
     const box = (i,label)=>{
       const cls = (i===picksel?'pick':'') + (label===m.marketFav?' mfav':'');
@@ -639,26 +662,13 @@ function renderBetting(){
       ? `Value on <b style="color:var(--ink)">${esc(m.pick)}</b> · adj edge +${m.edge}%`
       : (m.label==='diverge' ? `Model leans ${esc(m.modelFav)}, market likes ${esc(m.marketFav)}`
                              : `In line with the market (${esc(m.marketFav)})`);
-    const rows = [[m.a,0],['Draw',1],[m.b,2]].map(([lab,i])=>
-      `<tr><td class="l">${esc(lab)}</td><td>${m.odds[i]}</td><td>${m.mktImplied[i]}%</td><td>${m.model[i]}%</td><td class="${i===m.pickIdx?'hl':''}">${m.adj[i]}%</td></tr>`).join('');
-    return `<div class="bet ${m.label}">
-      <div class="bh"><b>${esc(m.a)}</b><span class="vs">vs</span><b>${esc(m.b)}</b><span class="vchip ${m.label}">${chiptxt}</span><span class="chev">▾</span></div>
+    return `<div class="bet ${m.label}" data-idx="${idx}">
+      <div class="bh"><b>${esc(m.a)}</b><span class="vs">vs</span><b>${esc(m.b)}</b><span class="vchip ${m.label}">${chiptxt}</span></div>
       <div class="o3">${box(0,m.a)}${box(1,'Draw')}${box(2,m.b)}</div>
-      <div class="bn">${summary}</div>
-      <div class="bd-detail">
-        <table class="bdtab"><colgroup><col style="width:34%"><col style="width:16%"><col style="width:18%"><col style="width:16%"><col style="width:16%"></colgroup>
-          <thead><tr><th class="l">Outcome</th><th>Odds</th><th>Market</th><th>Model</th><th>Adj</th></tr></thead><tbody>${rows}</tbody></table>
-        <div class="bdstats">
-          <span><b>${esc(m.a)}</b> · form ${esc(m.formA)} · Elo ${m.eloA}</span>
-          <span><b>${esc(m.b)}</b> · form ${esc(m.formB)} · Elo ${m.eloB}</span>
-          <span>Head-to-head: ${esc(m.h2h)}</span>
-        </div>
-        <p class="bdnote">${esc(m.note)}${m.label==='value'?` <b style="color:var(--teal)">Conviction ${stars(m.stars)}</b> — Kelly stake ${m.conv}% of bank · raw edge +${m.rawEdge}%.`:''}
-        <br><span style="color:var(--faint);font-size:11px">Market = de-vigged implied probability · Model = raw model · Adj = after shrinking to market by earned trust.</span></p>
-      </div></div>`;
+      <div class="bn">${summary} <span class="more">details ›</span></div></div>`;
   };
   const matches = B.matches && B.matches.length
-    ? `<div class="betgrid">${B.matches.map(card).join('')}</div>`
+    ? `<div class="betgrid">${B.matches.map((m,i)=>card(m,i)).join('')}</div>`
     : `<div class="panel"><div class="empty"><div class="ei">◌</div><p><b>No open match odds right now.</b></p>
        <p>Singapore Pools 1X2 odds appear here when upcoming fixtures are available.</p></div></div>`;
   const orow = o => `<tr><td class="l">${esc(o.team)}</td><td>${o.modelProb}%</td>
@@ -685,8 +695,15 @@ function renderBetting(){
     <p class="betsrc">Market column: ${esc(B.outrightNote)}. Fair odds = 1 ÷ model probability.</p>
     <div class="panel" style="padding:4px 12px 10px">
       <table class="otable"><thead><tr><th class="l">Team</th><th>Model</th><th>Fair odds</th><th>Market</th><th>Edge</th></tr></thead>
-      <tbody>${B.outright.map(orow).join('')}</tbody></table></div>`;
-  el.addEventListener('click', e=>{ const c=e.target.closest('.bet'); if(c) c.classList.toggle('open'); });
+      <tbody>${B.outright.map(orow).join('')}</tbody></table></div>
+    <div class="modal-bg" id="betModal"><div class="modal"><button class="mclose" aria-label="Close">✕</button><div id="betModalBody"></div></div></div>`;
+  const modal = el.querySelector('#betModal'), body = el.querySelector('#betModalBody');
+  el.addEventListener('click', e=>{
+    if(e.target.closest('.mclose') || e.target===modal){ modal.classList.remove('open'); return; }
+    const c = e.target.closest('.bet');
+    if(c){ body.innerHTML = detailHTML(B.matches[+c.dataset.idx]); modal.classList.add('open'); }
+  });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') modal.classList.remove('open'); });
 }
 
 /* SCORECARD */
