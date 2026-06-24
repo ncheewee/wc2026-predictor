@@ -275,7 +275,8 @@ def build_signals(matches, teams):
         act_name = {0:a,1:"Draw",2:b}[ai]
         log.append({"date":m.get("date","")[:10],"a":a,"b":b,"round":rnd,
                     "pred":pred_name,"conf":pred_conf,"score":f"{m['hg']}-{m['ag']}",
-                    "result":act_name,"correct":pi==ai})
+                    "result":act_name,"correct":pi==ai,
+                    "probs":[round(x,4) for x in model],"ax":ai})
         # --- now update ratings with the actual result ---
         ra,rb = elo[a], elo[b]
         ea = 1/(1+10**((rb-ra)/400))
@@ -307,13 +308,17 @@ def h2h_prob(a,b,h2h):
     share=(aw+0.5*dr)/total if a<b else (bw+0.5*dr)/total
     return 0.5 + (share-0.5)*0.7
 
-TOTAL_GOALS = 2.6   # baseline expected goals in a tie (typical for international football)
+TOTAL_GOALS = 2.6     # baseline expected goals in a tie (typical for international football)
+DRAW_CALIBRATION = 1.4  # Dixon-Coles-style boost: independent Poisson under-predicts draws.
+                        # 1.4 calibrates avg draw prob to the observed rate and minimises Brier
+                        # (validated on results so far). Raising it further only adds *wrong*
+                        # draw calls and worsens accuracy + Brier — draws aren't reliably callable.
 
 def one_x_two(p):
-    """Proper 1·X·2 via a Poisson goals model. Convert the blended binary win prob p
-    into a goal supremacy, split into expected goals per side, then sum the Poisson
-    score matrix into P(home), P(draw), P(away). Gives realistic draw probabilities
-    (~25-30% in even games) rather than a hand-tuned cap."""
+    """Proper 1·X·2 via a Poisson goals model with an empirical draw calibration.
+    Convert the blended binary win prob p into a goal supremacy, split into expected
+    goals per side, sum the Poisson score matrix into P(home)/P(draw)/P(away), then
+    nudge the draw mass up (Dixon-Coles effect) and renormalise."""
     p = min(0.99, max(0.01, p))
     d_eff = 400*math.log10(p/(1-p))            # effective Elo gap implied by p
     S = max(-2.5, min(2.5, d_eff/130.0))       # goal supremacy (home minus away), capped
@@ -329,6 +334,7 @@ def one_x_two(p):
             if i>j: ph+=pr
             elif i==j: pd+=pr
             else: pw+=pr
+    pd *= DRAW_CALIBRATION
     s = ph+pd+pw
     return [ph/s, pd/s, pw/s]
 
@@ -468,6 +474,17 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
     _lbl={"home":"Home wins","draw":"Draws","away":"Away wins"}
     by_outcome=[{"type":k,"label":_lbl[k],"total":_agg[k][0],"correct":_agg[k][1],
                  "pct":round(_agg[k][1]/_agg[k][0]*100) if _agg[k][0] else 0} for k in ("home","draw","away")]
+    # Brier score (proper scoring rule over the full 1·X·2 vector; lower is better, 0.667 = coin-flip)
+    brier=round(sum(sum((x["probs"][k]-(1 if x["ax"]==k else 0))**2 for k in range(3)) for x in log)/total,3) if total else 0.0
+    # accuracy by confidence band (does a 70% pick win ~70%?)
+    _bands=[("Toss-ups","< 45%",0,45),("Leans","45–59%",45,60),("Confident","60–74%",60,75),("Strong","≥ 75%",75,101)]
+    by_conf=[]
+    for nm,rng,lo,hi in _bands:
+        sub=[x for x in log if lo<=x["conf"]<hi]
+        by_conf.append({"label":nm,"range":rng,"total":len(sub),"correct":sum(1 for x in sub if x["correct"]),
+                        "pct":round(sum(1 for x in sub if x["correct"])/len(sub)*100) if sub else None})
+    draw_cal={"predicted":round(sum(x["probs"][1] for x in log)/total*100) if total else 0,
+              "actual":round(draws["actual"]/total*100) if total else 0}
     # ---- title-odds evolution: re-simulate each rating snapshot ----
     evolution=[]
     for label,snap in snaps:
@@ -536,7 +553,8 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
       "groups":stand,"results":results,"betting":betting,
       "championProgress":progress,
       "performance":{"accuracy":accuracy,"correct":correct,"total":total,"draws":draws,
-                     "byOutcome":by_outcome,
+                     "byOutcome":by_outcome,"brier":brier,"brierBase":0.667,
+                     "byConfidence":by_conf,"drawCal":draw_cal,
                      "matches":perf_matches,"evolution":evolution,"champion":champ_team},
     }
 

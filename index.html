@@ -686,16 +686,21 @@ function renderScorecard(){
     <td class="c"><span class="verdict ${m.correct?'ok':'no'}">${m.correct?'✓':'✗'}</span></td></tr>`).join('');
   el.innerHTML=`
     <div class="metrics">
-      <div class="metric"><div class="ml">Prediction accuracy</div><div class="mv">${P.accuracy}<small>%</small></div><div class="ms">correct outcome (1 · X · 2)</div></div>
-      <div class="metric"><div class="ml">Calls correct</div><div class="mv">${P.correct}<small> / ${P.total}</small></div><div class="ms">matches graded so far</div></div>
+      <div class="metric"><div class="ml">Prediction accuracy</div><div class="mv">${P.accuracy}<small>%</small></div><div class="ms">${P.correct}/${P.total} correct (1 · X · 2)</div></div>
+      ${P.brier!=null?`<div class="metric"><div class="ml">Brier score</div><div class="mv">${P.brier}</div><div class="ms">lower = better · ${P.brierBase} is coin-flip</div></div>`:''}
       <div class="metric"><div class="ml">Predicted champion</div><div class="mv" style="font-size:21px">${esc(P.champion)}</div><div class="ms">${top3.length?('now '+top3[0].prob+'% to win'):''}</div></div>
     </div>
-    ${P.draws?`<p class="betsrc" style="margin:-6px 0 16px">Outcomes are 1 · X · 2 — <b style="color:var(--muted)">draws are predicted too</b>. So far ${P.draws.actual} matches were drawn; the model called ${P.draws.correct} of them (draws are the hardest outcome for any model).</p>`:''}
+    ${P.draws?`<p class="betsrc" style="margin:-6px 0 16px">Outcomes are 1 · X · 2 — <b style="color:var(--muted)">draws are predicted too</b>. ${P.draws.actual} of ${P.total} matches were drawn; the model's draw probability is calibrated to ~${P.drawCal?P.drawCal.predicted:''}% (actual ~${P.drawCal?P.drawCal.actual:''}%), but draws rarely become its single most-likely call, so it's scored on probability (Brier), not on calling them. It has called ${P.draws.correct} outright.</p>`:''}
     ${P.byOutcome?`<div class="panel" style="padding:16px 20px;margin-bottom:18px">
       <div class="pt" style="border:none;padding:0 0 12px">Accuracy by outcome<span class="tag">by actual result</span></div>
       <div class="obreak">${P.byOutcome.map(o=>`<div class="cstat"><div class="cl">${esc(o.label)}</div>
         <div class="cvv">${o.pct}<span style="font-size:13px;color:var(--muted)">%</span></div>
         <div class="cl" style="margin:6px 0 0;text-transform:none;letter-spacing:0">${o.correct}/${o.total} called</div></div>`).join('')}</div></div>`:''}
+    ${P.byConfidence?`<div class="panel" style="padding:16px 20px;margin-bottom:18px">
+      <div class="pt" style="border:none;padding:0 0 12px">Accuracy by confidence<span class="tag">do bolder calls land more often?</span></div>
+      <div class="obreak" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">${P.byConfidence.map(c=>`<div class="cstat"><div class="cl">${esc(c.label)} · ${esc(c.range)}</div>
+        <div class="cvv">${c.pct==null?'—':c.pct+'<span style="font-size:13px;color:var(--muted)">%</span>'}</div>
+        <div class="cl" style="margin:6px 0 0;text-transform:none;letter-spacing:0">${c.correct}/${c.total} correct</div></div>`).join('')}</div></div>`:''}
     <div class="panel evo">
       <div class="pt" style="padding:0 0 12px;border:none">Title race — predicted champion's odds over time<span class="tag">${esc(P.champion)}</span></div>
       ${spark}
