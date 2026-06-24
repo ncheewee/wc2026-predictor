@@ -137,8 +137,7 @@ def compute_betting(fixtures, updated, elo, form, h2h, teamset, title_odds):
             continue
         names = {0: a, 1: "Draw", 2: b}
         p = match_prob(a, b, elo, form, h2h)           # P(a wins, binary)
-        pX = max(0.12, min(0.30, 0.30 - 0.16*abs(2*p-1)))
-        model = [p*(1-pX), pX, (1-p)*(1-pX)]           # [home, draw, away]
+        model = one_x_two(p)                            # [home, draw, away]
         imp = [1/o[0], 1/o[1], 1/o[2]]; s = sum(imp)
         fair = [i/s for i in imp]                       # de-vigged market probs
         ev = [model[i]*o[i]-1 for i in range(3)]        # EV per $1 staked
@@ -269,8 +268,7 @@ def build_signals(matches, teams):
             snaps.append((cur, snapshot())); cur = rnd
         # --- predict BEFORE seeing the result (using current ratings) ---
         p = match_prob(a,b,elo,form,h2h)
-        pX = max(0.12, min(0.30, 0.30-0.16*abs(2*p-1)))
-        model = [p*(1-pX), pX, (1-p)*(1-pX)]
+        model = one_x_two(p)
         pi = max(range(3), key=lambda i: model[i])
         pred_name = {0:a,1:"Draw",2:b}[pi]; pred_conf = round(model[pi]*100)
         ai = 0 if m["hg"]>m["ag"] else (1 if m["hg"]==m["ag"] else 2)
@@ -308,6 +306,17 @@ def h2h_prob(a,b,h2h):
     aw,dr,bw=rec; total=aw+dr+bw
     share=(aw+0.5*dr)/total if a<b else (bw+0.5*dr)/total
     return 0.5 + (share-0.5)*0.7
+
+def draw_prob(p):
+    """Draw likelihood from the binary win prob p. Peaks (~0.36) for evenly-matched
+    sides so 'Draw' can genuinely be the most-likely outcome in tight games, and falls
+    toward 0.10 for mismatches. A simple heuristic, not a goals model."""
+    return max(0.10, min(0.36, 0.36 - 0.26*abs(2*p-1)))
+
+def one_x_two(p):
+    """Return [home, draw, away] probabilities from binary win prob p."""
+    px = draw_prob(p)
+    return [p*(1-px), px, (1-p)*(1-px)]
 
 def match_prob(a,b,elo,form,h2h):
     ra=elo[a]+(35 if a in HOME_TEAMS else 0)
@@ -432,6 +441,9 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
     perf_matches=[{"date":x["date"],"a":x["a"],"b":x["b"],"pred":x["pred"],"conf":x["conf"],
                    "score":x["score"],"result":x["result"],"correct":x["correct"]}
                   for x in reversed(log)][:40]
+    draws={"actual":sum(1 for x in log if x["result"]=="Draw"),
+           "pred":sum(1 for x in log if x["pred"]=="Draw"),
+           "correct":sum(1 for x in log if x["pred"]=="Draw" and x["correct"])}
     # ---- title-odds evolution: re-simulate each rating snapshot ----
     evolution=[]
     for label,snap in snaps:
@@ -499,7 +511,7 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
                           "H2H records linked","ratings recomputed after each result","next auto-sync ~2h"]},
       "groups":stand,"results":results,"betting":betting,
       "championProgress":progress,
-      "performance":{"accuracy":accuracy,"correct":correct,"total":total,
+      "performance":{"accuracy":accuracy,"correct":correct,"total":total,"draws":draws,
                      "matches":perf_matches,"evolution":evolution,"champion":champ_team},
     }
 

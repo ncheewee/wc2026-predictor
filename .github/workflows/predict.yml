@@ -5,7 +5,7 @@ name: Refresh World Cup 2026 prediction
 
 on:
   schedule:
-    - cron: "0 */2 * * *"   # every 2 hours (UTC; GitHub may delay under load)
+    - cron: "*/30 * * * *"   # every 30 minutes (UTC; GitHub may delay under load)
   workflow_dispatch: {}      # manual "refresh now"
   push:
     branches: [main]         # redeploy on code changes

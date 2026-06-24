@@ -689,6 +689,7 @@ function renderScorecard(){
       <div class="metric"><div class="ml">Calls correct</div><div class="mv">${P.correct}<small> / ${P.total}</small></div><div class="ms">matches graded so far</div></div>
       <div class="metric"><div class="ml">Predicted champion</div><div class="mv" style="font-size:21px">${esc(P.champion)}</div><div class="ms">${top3.length?('now '+top3[0].prob+'% to win'):''}</div></div>
     </div>
+    ${P.draws?`<p class="betsrc" style="margin:-6px 0 16px">Outcomes are 1 · X · 2 — <b style="color:var(--muted)">draws are predicted too</b>. So far ${P.draws.actual} matches were drawn; the model called ${P.draws.correct} of them (draws are the hardest outcome for any model).</p>`:''}
     <div class="panel evo">
       <div class="pt" style="padding:0 0 12px;border:none">Title race — predicted champion's odds over time<span class="tag">${esc(P.champion)}</span></div>
       ${spark}
