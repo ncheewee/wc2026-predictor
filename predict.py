@@ -219,7 +219,8 @@ def fetch_openfootball():
             continue                                  # knockout placeholder slot
         stage = "Group Stage" if m.get("group") else (m.get("round") or "Knockout")
         matches.append({"date": m.get("date",""), "home": a, "away": b,
-                        "hg": int(sc[0]), "ag": int(sc[1]), "stage": stage})
+                        "hg": int(sc[0]), "ag": int(sc[1]), "stage": stage,
+                        "round": m.get("round") or stage})
         played += 1
     matches.sort(key=lambda x: x["date"])
     print(f"[of] groups={len(groups)} teams={len(teamset)} played_matches={played}")
@@ -235,7 +236,8 @@ def synth_sample(seed=20260623):
             hg=max(0,int(round(rng.gauss(1.3+(pa-0.5)*2.4,1.0))))
             ag=max(0,int(round(rng.gauss(1.3+((1-pa)-0.5)*2.4,1.0))))
             matches.append({"date":(base+dt.timedelta(days=md+i//3)).isoformat()+"Z",
-                            "home":ta,"away":tb,"hg":hg,"ag":ag,"stage":"Group Stage"})
+                            "home":ta,"away":tb,"hg":hg,"ag":ag,"stage":"Group Stage",
+                            "round":f"Matchday {i//2+1}"})
         md+=4
     matches.sort(key=lambda m:m["date"])
     return matches, [(k,v) for k,v in GROUPS.items()]
@@ -243,14 +245,40 @@ def synth_sample(seed=20260623):
 def elo_of(team):
     return BASE_ELO.get(team, DEFAULT_ELO)
 
+def ordinal(n):
+    if not n: return "—"
+    if 10 <= n % 100 <= 20: return f"{n}th"
+    return f"{n}{ {1:'st',2:'nd',3:'rd'}.get(n%10,'th') }".replace(" ", "")
+
 # ----------------------------------------------------------------------------- signals
 def build_signals(matches, teams):
+    """Walk forward through results: for each match, record what the model would have
+    predicted from PRE-match ratings, then update ratings. Also snapshot ratings at the
+    end of each round (matchday) so outright odds can be re-simulated over time."""
     elo = {t: elo_of(t) for t in teams}
     form = {t: [] for t in teams}
-    h2h = {}; feed=[]
+    h2h = {}; feed=[]; log=[]; snaps=[]; cur=None
+    def snapshot():
+        return (elo.copy(), {k:v[:] for k,v in form.items()}, {k:list(v) for k,v in h2h.items()})
     for m in matches:
         a,b = m["home"], m["away"]
         if a not in elo or b not in elo: continue
+        rnd = m.get("round","?")
+        if cur is None: cur = rnd
+        if rnd != cur:
+            snaps.append((cur, snapshot())); cur = rnd
+        # --- predict BEFORE seeing the result (using current ratings) ---
+        p = match_prob(a,b,elo,form,h2h)
+        pX = max(0.12, min(0.30, 0.30-0.16*abs(2*p-1)))
+        model = [p*(1-pX), pX, (1-p)*(1-pX)]
+        pi = max(range(3), key=lambda i: model[i])
+        pred_name = {0:a,1:"Draw",2:b}[pi]; pred_conf = round(model[pi]*100)
+        ai = 0 if m["hg"]>m["ag"] else (1 if m["hg"]==m["ag"] else 2)
+        act_name = {0:a,1:"Draw",2:b}[ai]
+        log.append({"date":m.get("date","")[:10],"a":a,"b":b,"round":rnd,
+                    "pred":pred_name,"conf":pred_conf,"score":f"{m['hg']}-{m['ag']}",
+                    "result":act_name,"correct":pi==ai})
+        # --- now update ratings with the actual result ---
         ra,rb = elo[a], elo[b]
         ea = 1/(1+10**((rb-ra)/400))
         sa = 1.0 if m["hg"]>m["ag"] else (0.0 if m["hg"]<m["ag"] else 0.5)
@@ -265,8 +293,9 @@ def build_signals(matches, teams):
         elif sa==0: rec[2 if a<b else 0]+=1
         else: rec[1]+=1
         feed.append({"a":a,"b":b,"score":f"{m['hg']}-{m['ag']}","delta":delta})
+    if cur is not None: snaps.append(("Now", snapshot()))
     feed.reverse()
-    return elo, form, h2h, feed
+    return elo, form, h2h, feed, log, snaps
 
 def form_prob(team, form):
     r = form.get(team, [])[-FORM_WINDOW:]
@@ -386,7 +415,7 @@ def build_bracket_view(r32,elo,form,h2h,fav):
 # ----------------------------------------------------------------------------- assemble + inject
 def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
     teams=[t for _,ts in groups for t in ts]
-    elo,form,h2h,feed=build_signals(matches,teams)
+    elo,form,h2h,feed,log,snaps=build_signals(matches,teams)
     stand=standings(matches,groups)
     r32=build_bracket_seed(stand,elo)
     odds=monte_carlo(r32,elo,form,h2h)
@@ -396,6 +425,43 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
     champ_team,champ_prob=ranked[0][0],round(ranked[0][1]*100,1)
     contenders=[{"team":t,"prob":round(p*100,1)} for t,p in ranked[:6]]
     bracket_rounds=build_bracket_view(r32,elo,form,h2h,fav)
+
+    # ---- Scorecard: prediction accuracy (walk-forward) ----
+    total=len(log); correct=sum(1 for x in log if x["correct"])
+    accuracy=round(correct/total*100,1) if total else 0.0
+    perf_matches=[{"date":x["date"],"a":x["a"],"b":x["b"],"pred":x["pred"],"conf":x["conf"],
+                   "score":x["score"],"result":x["result"],"correct":x["correct"]}
+                  for x in reversed(log)][:40]
+    # ---- title-odds evolution: re-simulate each rating snapshot ----
+    evolution=[]
+    for label,snap in snaps:
+        e,f,hh=snap
+        od=monte_carlo(r32,e,f,hh,sims=2500,seed=7)
+        rk=sorted(od.items(),key=lambda kv:kv[1],reverse=True)
+        cpos=next((i+1 for i,(t,_) in enumerate(rk) if t==champ_team),None)
+        evolution.append({"stage":label,"leader":rk[0][0],"leaderProb":round(rk[0][1]*100,1),
+                          "champRank":cpos,"champProb":round(od.get(champ_team,0)*100,1),
+                          "top3":[{"team":t,"prob":round(p*100,1)} for t,p in rk[:3]]})
+    # ---- champion progress / supporting stats ----
+    crow=cgrp=cpos=None
+    for g,rows in stand:
+        for i,r in enumerate(rows):
+            if r[0]==champ_team: crow,cgrp,cpos=r,g,i+1
+    champ_form=form.get(champ_team,[])[-5:]
+    form_letters="".join("W" if x==3 else ("D" if x==1 else "L") for x in champ_form) or "—"
+    elo_delta=round(elo.get(champ_team,1650)-elo_of(champ_team))
+    first_prob=evolution[0]["champProb"] if evolution else champ_prob
+    trend="risen" if champ_prob>first_prob else ("held" if champ_prob==first_prob else "eased")
+    champ_log=[x for x in log if champ_team in (x["a"],x["b"])]
+    champ_wins=sum(1 for x in champ_log if x["result"]==champ_team)
+    progress={"team":champ_team,"group":cgrp,"groupPos":cpos,
+              "record":(f"{crow[2]}W-{crow[3]}D-{crow[4]}L" if crow else "—"),
+              "gd":(crow[5] if crow else 0),"pts":(crow[6] if crow else 0),
+              "form":form_letters,"eloDelta":elo_delta,"played":len(champ_log),"wins":champ_wins,
+              "note":(f"{champ_team} sit {ordinal(cpos)} in Group {cgrp} on {crow[6] if crow else 0} points "
+                      f"with a {'+' if (crow[5] if crow else 0)>=0 else ''}{crow[5] if crow else 0} goal difference, "
+                      f"and have moved their rating {'+' if elo_delta>=0 else ''}{elo_delta} Elo since kick-off. "
+                      f"Their simulated title odds have {trend} from {first_prob}% to {champ_prob}% as results land.")}
 
     def elo_strength(t): return round(min(99,max(1,(elo[t]-1550)/6)))
     second=contenders[1]["team"] if len(contenders)>1 else fav
@@ -432,6 +498,9 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
                 "checks":["fixtures + groups fetched","scores parsed","form window = last 10",
                           "H2H records linked","ratings recomputed after each result","next auto-sync ~2h"]},
       "groups":stand,"results":results,"betting":betting,
+      "championProgress":progress,
+      "performance":{"accuracy":accuracy,"correct":correct,"total":total,
+                     "matches":perf_matches,"evolution":evolution,"champion":champ_team},
     }
 
 def inject(html_path, data):

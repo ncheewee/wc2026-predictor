@@ -194,6 +194,38 @@
   .legend2{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;margin:2px 0 14px}
   .legend2 b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 
+  /* scorecard */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .metric{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;backdrop-filter:blur(10px)}
+  .metric .ml{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+  .metric .mv{font-family:var(--disp);font-size:30px;font-weight:700;color:var(--teal);line-height:1}
+  .metric .mv small{font-size:14px;color:var(--muted)}
+  .metric .ms{font-size:12px;color:var(--muted);margin-top:6px}
+  .evo{padding:18px 22px}
+  .evo svg{width:100%;height:auto;display:block;overflow:visible}
+  .evosum{font-size:13px;color:#bcd2ce;line-height:1.6;margin:12px 0 0}
+  .evosum b{color:var(--teal)}
+  .sctable{width:100%;border-collapse:collapse;font-size:13px}
+  .sctable th{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:400;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .sctable th.r,.sctable td.r{text-align:right}
+  .sctable th.c,.sctable td.c{text-align:center}
+  .sctable td{padding:9px 10px;border-bottom:1px solid rgba(80,220,200,.06)}
+  .sctable .fix{font-weight:500}
+  .sctable .sc-pred{color:var(--muted)}
+  .sctable .res{font-family:var(--disp);font-weight:700}
+  .verdict{font-family:var(--disp);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .verdict.ok{color:var(--bg);background:var(--teal)}
+  .verdict.no{color:var(--red);background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.4)}
+  /* champion progress (overview) */
+  .cprog{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:4px 0 14px}
+  .cstat{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .cstat .cl{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .cstat .cvv{font-family:var(--disp);font-size:19px;font-weight:700}
+  .cstat .cvv.up{color:var(--lime)}.cstat .cvv.dn{color:var(--red)}
+  .formdots span{display:inline-block;width:17px;height:17px;border-radius:5px;font-family:var(--disp);font-size:10px;
+    font-weight:700;text-align:center;line-height:17px;margin-right:3px;color:var(--bg)}
+  .fd-w{background:var(--teal)}.fd-d{background:var(--amber)}.fd-l{background:var(--red)}
+
   /* methodology */
   .flow{display:grid;grid-template-columns:repeat(3,1fr) .4fr 1fr;gap:10px;align-items:stretch;margin-bottom:30px}
   .fstep{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;backdrop-filter:blur(10px)}
@@ -242,6 +274,7 @@
   <div class="tabs" id="tabs">
     <button class="tab on" data-tab="overview">Overview</button>
     <button class="tab" data-tab="bracket">Bracket</button>
+    <button class="tab" data-tab="scorecard">Scorecard</button>
     <button class="tab" data-tab="data">Data</button>
     <button class="tab" data-tab="betting">Betting</button>
     <button class="tab" data-tab="methodology">Methodology</button>
@@ -251,6 +284,7 @@
 
   <section id="tab-overview"></section>
   <section id="tab-bracket" class="hide"></section>
+  <section id="tab-scorecard" class="hide"></section>
   <section id="tab-data" class="hide"></section>
   <section id="tab-betting" class="hide"></section>
   <section id="tab-methodology" class="hide"></section>
@@ -343,6 +377,7 @@
 const DATA = JSON.parse(document.getElementById('prediction-data').textContent);
 const conf = p => p>=70?'hi':(p>=58?'md':'lo');
 const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const ordinal = n => !n ? '—' : ((n%100>=10&&n%100<=20) ? n+'th' : n+({1:'st',2:'nd',3:'rd'}[n%10]||'th'));
 
 /* header + banner */
 document.getElementById('updated').textContent = 'Updated ' + (DATA.ingest?.ago || 'recently');
@@ -354,6 +389,7 @@ document.getElementById('footer').textContent =
 /* OVERVIEW */
 function renderOverview(){
   const c = DATA.champion;
+  const cp = DATA.championProgress;
   const leaders = DATA.contenders.map((t,i)=>{
     const w = Math.round(t.prob/DATA.contenders[0].prob*100);
     const d = i>2?' d':'';
@@ -414,6 +450,18 @@ function renderOverview(){
         <div class="body"><div class="mod">${blend}</div></div>
       </div>
     </div>
+    ${cp ? `<div class="panel" style="margin-top:18px">
+      <div class="pt">How ${esc(cp.team)} are tracking<span class="tag">champion watch</span></div>
+      <div class="body">
+        <div class="cprog">
+          <div class="cstat"><div class="cl">Group ${esc(cp.group||'—')}</div><div class="cvv">${ordinal(cp.groupPos)}</div></div>
+          <div class="cstat"><div class="cl">Record</div><div class="cvv">${esc(cp.record)}</div></div>
+          <div class="cstat"><div class="cl">Goal diff</div><div class="cvv">${cp.gd>=0?'+':''}${cp.gd}</div></div>
+          <div class="cstat"><div class="cl">Form</div><div class="formdots">${cp.form==='—'?'—':[...cp.form].map(x=>`<span class="fd-${x.toLowerCase()}">${x}</span>`).join('')}</div></div>
+          <div class="cstat"><div class="cl">Elo since KO</div><div class="cvv ${cp.eloDelta>=0?'up':'dn'}">${cp.eloDelta>=0?'+':''}${cp.eloDelta}</div></div>
+        </div>
+        <p class="why">${esc(cp.note)} <a data-goto="scorecard" href="#">→ see full scorecard &amp; title race</a></p>
+      </div></div>` : ''}
     <div class="panel" style="margin-top:18px">
       <div class="pt">Why ${esc(c.team)} — plain language<span class="tag">reasoning</span></div>
       <div class="body"><p class="why">${esc(DATA.reasoning)} <a data-goto="methodology" href="#">→ open methodology &amp; limitations</a></p></div>
@@ -597,10 +645,66 @@ function renderBetting(){
       <tbody>${B.outright.map(orow).join('')}</tbody></table></div>`;
 }
 
+/* SCORECARD */
+function renderScorecard(){
+  const el = document.getElementById('tab-scorecard');
+  const P = DATA.performance;
+  if(!P){ el.innerHTML = `<div class="panel"><div class="empty"><div class="ei">◌</div>
+    <p><b>The scorecard fills in as matches are played.</b></p>
+    <p>Each result is graded against what the model predicted beforehand.</p></div></div>`; return; }
+  const evo = P.evolution || [];
+  let spark = '', summary = '';
+  if(evo.length){
+    const W=640,H=120,pad=8;
+    const ys=evo.map(e=>e.champProb);
+    const maxy=Math.max(...ys,1)*1.18, miny=Math.max(0,Math.min(...ys)*0.85);
+    const X=i=>pad+i*(W-2*pad)/Math.max(1,evo.length-1);
+    const Y=v=>H-pad-(v-miny)/((maxy-miny)||1)*(H-2*pad);
+    const pts=evo.map((e,i)=>`${X(i).toFixed(1)},${Y(e.champProb).toFixed(1)}`).join(' ');
+    const dots=evo.map((e,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(e.champProb).toFixed(1)}" r="${i===evo.length-1?4:2.6}" fill="${e.champRank===1?'#2af0c8':'#ffce4d'}"/>`).join('');
+    const cur=evo[evo.length-1];
+    spark=`<svg viewBox="0 -6 ${W} ${H+24}" preserveAspectRatio="none">
+      <polygon points="${pad},${H-pad} ${pts} ${W-pad},${H-pad}" fill="rgba(42,240,200,.08)"/>
+      <polyline points="${pts}" fill="none" stroke="#2af0c8" stroke-width="2" style="filter:drop-shadow(0 0 4px rgba(42,240,200,.5))"/>
+      ${dots}
+      <text x="${X(0).toFixed(1)}" y="${H-pad+15}" fill="#5a7373" font-size="10" font-family="Inter,sans-serif">${esc(evo[0].stage)}</text>
+      <text x="${(W-pad).toFixed(1)}" y="${H-pad+15}" fill="#5a7373" font-size="10" text-anchor="end" font-family="Inter,sans-serif">${esc(cur.stage)}</text>
+      <text x="${(W-pad).toFixed(1)}" y="${(Y(cur.champProb)-8).toFixed(1)}" fill="#2af0c8" font-size="12" font-weight="700" text-anchor="end" font-family="Chakra Petch,sans-serif">${cur.champProb}%</text>
+    </svg>`;
+    const behind=evo.filter(e=>e.champRank>1);
+    if(!behind.length) summary=`<b>${esc(P.champion)}</b> have topped the model's title race at every checkpoint — currently ${cur.champProb}% to lift the trophy.`;
+    else{ const worst=behind.reduce((a,b)=>b.champRank>a.champRank?b:a);
+      summary=`<b>${esc(P.champion)}</b> weren't always favourite — as low as ${ordinal(worst.champRank)}, behind ${esc(worst.leader)}, around ${esc(worst.stage)} — before climbing to lead at ${cur.champProb}%.`; }
+  }
+  const top3=evo.length?evo[evo.length-1].top3:[];
+  const rows=(P.matches||[]).map(m=>`<tr>
+    <td>${esc(m.date)}</td>
+    <td class="fix">${esc(m.a)} <span style="color:var(--faint)">v</span> ${esc(m.b)}</td>
+    <td class="sc-pred">${esc(m.pred)} · ${m.conf}%</td>
+    <td><span class="res">${esc(m.score)}</span> <span style="color:var(--muted)">${esc(m.result)}</span></td>
+    <td class="c"><span class="verdict ${m.correct?'ok':'no'}">${m.correct?'✓':'✗'}</span></td></tr>`).join('');
+  el.innerHTML=`
+    <div class="metrics">
+      <div class="metric"><div class="ml">Prediction accuracy</div><div class="mv">${P.accuracy}<small>%</small></div><div class="ms">correct outcome (1 · X · 2)</div></div>
+      <div class="metric"><div class="ml">Calls correct</div><div class="mv">${P.correct}<small> / ${P.total}</small></div><div class="ms">matches graded so far</div></div>
+      <div class="metric"><div class="ml">Predicted champion</div><div class="mv" style="font-size:21px">${esc(P.champion)}</div><div class="ms">${top3.length?('now '+top3[0].prob+'% to win'):''}</div></div>
+    </div>
+    <div class="panel evo">
+      <div class="pt" style="padding:0 0 12px;border:none">Title race — predicted champion's odds over time<span class="tag">${esc(P.champion)}</span></div>
+      ${spark}
+      <p class="evosum">${summary}</p>
+    </div>
+    <h2 class="sec">Every prediction vs result</h2>
+    <p class="betsrc">Graded the moment each match finishes — newest first. "Correct" = the model's most-likely outcome matched the actual 1·X·2 result.</p>
+    <div class="panel" style="padding:4px 10px 8px">
+      <table class="sctable"><thead><tr><th>Date</th><th>Match</th><th>Model pick</th><th>Result</th><th class="c">Call</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+}
+
 /* tabs */
 function show(tab){
   document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===tab));
-  ['overview','bracket','data','betting','methodology'].forEach(t=>{
+  ['overview','bracket','scorecard','data','betting','methodology'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hide',t!==tab);
   });
   window.scrollTo({top:0,behavior:'smooth'});
@@ -611,9 +715,13 @@ document.getElementById('tabs').addEventListener('click',e=>{
 document.addEventListener('click',e=>{
   const g = e.target.closest('[data-goto]'); if(g){e.preventDefault();show(g.dataset.goto);}
 });
-document.getElementById('refresh').addEventListener('click',()=>location.reload());
+document.getElementById('refresh').addEventListener('click',()=>{
+  const u=new URL(location.href); u.searchParams.set('t',Date.now()); location.replace(u.toString());
+});
+document.getElementById('refresh').title =
+  'Reloads the latest published build. Fresh results are recomputed by the scheduled job every ~2 hours.';
 
-renderOverview(); renderBracket(); renderData(); renderBetting(); renderMethodology();
+renderOverview(); renderBracket(); renderScorecard(); renderData(); renderBetting(); renderMethodology();
 </script>
 </body>
 </html>

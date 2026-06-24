@@ -2,7 +2,11 @@
 
 A single-page, self-contained web app that predicts who will win the 2026 World Cup. It blends three simple models — Elo rating, recent form, and head-to-head history — and runs a Monte Carlo simulation (10,000 tournaments per refresh) to turn them into probabilities. Hosted free on GitHub Pages; predictions refresh automatically every ~2 hours via a scheduled GitHub Action as real results come in.
 
-Five tabs: **Overview** (predicted champion, confidence, the path to the final, plain-language reasoning), **Bracket** (projected knockout tree with per-tie win probabilities), **Data** (ingestion status, every group standing, and a result feed showing how each match moved the ratings — your verification view), **Betting** (Singapore Pools 1X2 odds for upcoming matches compared against the model, with a measured value/edge read), and **Methodology** (how it works and where it can be wrong).
+Six tabs: **Overview** (predicted champion, confidence, the path to the final, plain-language reasoning, and a champion-progress panel), **Bracket** (projected knockout tree with per-tie win probabilities), **Scorecard** (every past prediction graded against the actual result with a running accuracy %, plus the predicted champion's title-odds evolution over time), **Data** (ingestion status, every group standing, and a result feed showing how each match moved the ratings — your verification view), **Betting** (Singapore Pools 1X2 odds for upcoming matches compared against the model, with a measured value/edge read), and **Methodology** (how it works and where it can be wrong).
+
+### A note on refreshing
+
+The page's **Refresh** button reloads the latest *published* build (with a cache-buster). It does **not** recompute predictions — this is a static site with no backend. Fresh results are fetched and the model re-run by the scheduled GitHub Action **every ~2 hours**; to force an immediate update, run the workflow manually (Actions → *Refresh World Cup 2026 prediction* → *Run workflow*). The Scorecard's accuracy and the match log grow automatically as each result lands. (Want timelier updates? Lower the cron interval in `.github/workflows/predict.yml`.)
 
 ### Betting tab — read this
 
