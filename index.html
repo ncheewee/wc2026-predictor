@@ -613,17 +613,18 @@ function renderBetting(){
     <p><b>Odds load on the first live build.</b></p>
     <p>The betting view populates from Singapore Pools odds once the GitHub Action runs.</p></div></div>`; return; }
   const chip = {value:'Value', diverge:'Model differs', agree:'In line'};
+  const stars = n => '★'.repeat(n)+'☆'.repeat(3-n);
   const card = m => {
-    const picksel = m.lean ? ({'1':0,'X':1,'2':2})[m.lean.sel] : -1;
+    const picksel = m.stars>0 ? m.pickIdx : -1;
     const box = (i,label)=>{
       const cls = (i===picksel?'pick':'') + (label===m.marketFav?' mfav':'');
       return `<div class="ob ${cls}"><span class="ol">${esc(label)}</span><span class="ov">${m.odds[i]}</span><span class="om">model ${m.model[i]}%</span></div>`;
     };
-    const chiptxt = m.label==='value' ? ('Value +'+m.lean.edge+'%') : chip[m.label];
+    const chiptxt = m.label==='value' ? (stars(m.stars)+' '+esc(m.pick)) : chip[m.label];
     return `<div class="bet ${m.label}">
       <div class="bh"><b>${esc(m.a)}</b><span class="vs">vs</span><b>${esc(m.b)}</b><span class="vchip ${m.label}">${chiptxt}</span></div>
       <div class="o3">${box(0,m.a)}${box(1,'Draw')}${box(2,m.b)}</div>
-      <div class="bn">${esc(m.note)}</div></div>`;
+      <div class="bn">${esc(m.note)}${m.label==='value'?` <span style="color:var(--faint)">(adj edge +${m.edge}%, raw +${m.rawEdge}%)</span>`:''}</div></div>`;
   };
   const matches = B.matches && B.matches.length
     ? `<div class="betgrid">${B.matches.map(card).join('')}</div>`
@@ -632,11 +633,20 @@ function renderBetting(){
   const orow = o => `<tr><td class="l">${esc(o.team)}</td><td>${o.modelProb}%</td>
     <td>${o.fairOdds??'—'}</td><td>${o.marketOdds??'—'}</td>
     <td class="ev ${o.label||''}">${o.edge==null?'—':((o.edge>=0?'+':'')+o.edge+'%')}</td></tr>`;
+  const tr = B.trust;
   el.innerHTML = `
     <div class="disc"><b>⚠ Not betting advice.</b> ${esc(B.disclaimer)}</div>
     <p class="betsrc">Odds: ${esc(B.source)} · updated ${esc(B.oddsUpdated)}</p>
-    <h2 class="sec">Upcoming matches — model vs market</h2>
-    <div class="legend2"><span><b style="background:var(--teal)"></b>Model sees a small edge</span>
+    ${B.method?`<div class="panel" style="padding:14px 18px;margin-bottom:14px">
+      <p style="font-size:13px;color:#bcd2ce;margin:0 0 ${tr?'12px':'0'};line-height:1.6">${esc(B.method)}</p>
+      ${tr?`<div class="obreak" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))">
+        <div class="cstat"><div class="cl">Trust · home win</div><div class="cvv">${tr.home}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
+        <div class="cstat"><div class="cl">Trust · draw</div><div class="cvv">${tr.draw}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
+        <div class="cstat"><div class="cl">Trust · away win</div><div class="cvv">${tr.away}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
+        <div class="cstat"><div class="cl">Kelly fraction</div><div class="cvv">${tr.kelly}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
+      </div>`:''}</div>`:''}
+    <h2 class="sec">Upcoming matches — confidence-balanced value</h2>
+    <div class="legend2"><span style="color:var(--teal)">★★★ conviction (edge × earned trust × Kelly)</span>
       <span><b style="background:var(--amber)"></b>Model differs from market</span>
       <span><b style="background:#3a5560"></b>In line with market</span></div>
     ${matches}

@@ -127,50 +127,60 @@ def fetch_odds():
     print(f"[odds] sgodds W-Cup fixtures parsed: {len(fixtures)}")
     return fixtures, (upd.group(1).strip() if upd else None)
 
-def compute_betting(fixtures, updated, elo, form, h2h, teamset, title_odds):
-    """Compare model probabilities to Singapore Pools odds; flag value (positive EV)."""
-    def lab(edge):  # edge as a fraction
-        return "value" if edge >= ODDS_VALUE_EDGE else ("lean" if edge >= 0 else "no-value")
+def compute_betting(fixtures, updated, elo, form, h2h, teamset, title_odds, reliability=None):
+    """Confidence-balanced value vs Singapore Pools odds.
+    Layer 1: shrink the model toward the de-vigged market by how reliable the model has
+    actually been for that outcome (home/draw/away) — earned trust, set by the data.
+    Layer 2: size conviction with fractional Kelly (Kelly fraction itself scaled by the
+    model's overall Brier skill). Output a 0-3 star conviction per pick."""
+    rel = reliability or {"home":1.0,"draw":1.0,"away":1.0,"kelly":0.25}
+    r_by = [rel.get("home",1.0), rel.get("draw",1.0), rel.get("away",1.0)]
+    kelly = rel.get("kelly",0.25)
     matches = []
     for a, b, o in fixtures:
         if a not in teamset or b not in teamset:
             continue
         names = {0: a, 1: "Draw", 2: b}
-        p = match_prob(a, b, elo, form, h2h)           # P(a wins, binary)
-        model = one_x_two(p)                            # [home, draw, away]
+        p = match_prob(a, b, elo, form, h2h)
+        model = one_x_two(p)                                  # raw model [home,draw,away]
         imp = [1/o[0], 1/o[1], 1/o[2]]; s = sum(imp)
-        fair = [i/s for i in imp]                       # de-vigged market probs
-        ev = [model[i]*o[i]-1 for i in range(3)]        # EV per $1 staked
-        mkt_fav, mdl_fav = min(range(3), key=lambda i: o[i]), max(range(3), key=lambda i: model[i])
-        agree = mkt_fav == mdl_fav
-        # A "lean" only counts when it's a plausible price (not a longshot the model
-        # can't be trusted on) and the edge is in a sane band — this is a toy model,
-        # the market is usually sharper, so we deliberately suppress longshot blow-ups.
-        cand = [i for i in range(3) if o[i] <= 4.0]
-        lean = None
-        if cand:
-            bi = max(cand, key=lambda i: ev[i])
-            if 0.05 <= ev[bi] <= 0.40:
-                lean = {"sel": ["1","X","2"][bi], "name": names[bi],
-                        "edge": round(ev[bi]*100,1),
-                        "modelPct": round(model[bi]*100), "marketPct": round(fair[bi]*100)}
-        if lean:
-            label = "value"; rank = 0
-            note = (f"Model rates {lean['name']} higher than the market "
-                    f"({lean['modelPct']}% vs {lean['marketPct']}%) — a small +{lean['edge']}% edge.")
-        elif agree:
-            label = "agree"; rank = 2
-            note = f"Model agrees with the market favourite, {names[mkt_fav]}."
+        fair = [i/s for i in imp]                             # de-vigged market probs
+        # Layer 1 — shrink toward market by earned reliability, then renormalise
+        p_used = [r_by[i]*model[i] + (1-r_by[i])*fair[i] for i in range(3)]
+        su = sum(p_used) or 1; p_used = [x/su for x in p_used]
+        ev = [p_used[i]*o[i]-1 for i in range(3)]             # confidence-adjusted edge
+        ev_raw = [model[i]*o[i]-1 for i in range(3)]          # raw edge (transparency)
+        mkt_fav = min(range(3), key=lambda i: o[i])
+        mdl_fav = max(range(3), key=lambda i: p_used[i])
+        bi = max(range(3), key=lambda i: ev[i]); edge = ev[bi]
+        # Layer 2 — fractional Kelly conviction on the adjusted edge
+        f = max(0.0, edge/(o[bi]-1)) if o[bi] > 1 else 0.0
+        conv = f*kelly
+        stars = 3 if conv>=0.06 else (2 if conv>=0.03 else (1 if (conv>=0.012 and edge>0) else 0))
+        if p_used[bi] < 0.25:   # confidence floor — don't back a pick the model itself rates a longshot
+            stars = 0
+        if stars >= 1:
+            label = "value"
+            note = (f"Model (trust-adjusted) {round(p_used[bi]*100)}% vs market "
+                    f"{round(fair[bi]*100)}% on {names[bi]} — edge +{round(edge*100)}% after "
+                    f"shrinking to the market by the model's track record on this outcome.")
+        elif mkt_fav == mdl_fav:
+            label = "agree"
+            note = f"In line with the market favourite, {names[mkt_fav]}."
         else:
-            label = "diverge"; rank = 1
-            note = (f"Model leans {names[mdl_fav]} but the market favours {names[mkt_fav]} — "
-                    "no betting edge, treat as model uncertainty.")
+            label = "diverge"
+            note = (f"Model leans {names[mdl_fav]} but the edge isn't trustworthy enough to back "
+                    "once shrunk toward the market.")
         matches.append({"a": a, "b": b, "odds": [round(x,2) for x in o],
                         "model": [round(x*100) for x in model],
+                        "adj": [round(x*100) for x in p_used],
                         "marketFav": names[mkt_fav], "modelFav": names[mdl_fav],
-                        "lean": lean, "label": label, "note": note, "_rank": rank})
-    matches.sort(key=lambda m: (m["_rank"], -(m["lean"]["edge"] if m["lean"] else 0)))
-    for m in matches: m.pop("_rank", None)
+                        "pick": names[bi], "pickIdx": bi, "edge": round(edge*100,1),
+                        "rawEdge": round(ev_raw[bi]*100,1), "stars": stars,
+                        "label": label, "note": note})
+    matches.sort(key=lambda m: (-m["stars"], -m["edge"]))
+    def lab(edge):
+        return "value" if edge >= ODDS_VALUE_EDGE else ("lean" if edge >= 0 else "no-value")
     outright = []
     for team, prob in sorted(title_odds.items(), key=lambda kv: kv[1], reverse=True)[:8]:
         mk = OUTRIGHT_ODDS.get(team)
@@ -183,6 +193,11 @@ def compute_betting(fixtures, updated, elo, form, h2h, teamset, title_odds):
         "oddsUpdated": updated or "—",
         "source": "Singapore Pools (via sgodds.com)",
         "matches": matches, "outright": outright, "outrightNote": OUTRIGHT_AS_OF,
+        "trust": {"home":round(r_by[0]*100),"draw":round(r_by[1]*100),"away":round(r_by[2]*100),
+                  "kelly":round(kelly*100)},
+        "method": ("Value is shrunk toward the market by how reliable the model has actually been "
+                   "on each outcome (home/draw/away), then sized by fractional Kelly into a 0–3★ "
+                   "conviction. Trust and Kelly fraction are set by the model's own track record."),
         "disclaimer": ("For analysis and entertainment only — not betting advice. Odds move "
                        "constantly; always verify on Singapore Pools before acting. Sports betting "
                        "in Singapore is 21+ and legal only via Singapore Pools. If gambling may be "
@@ -527,11 +542,20 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None, knock
     teams=[t for _,ts in groups for t in ts]
     elo,form,h2h,feed,log,snaps=build_signals(matches,teams)
     stand=standings(matches,groups)
+    # ---- data-driven reliability (earned trust) for confidence-balanced betting ----
+    def _ot(x): return "draw" if x["result"]=="Draw" else ("home" if x["result"]==x["a"] else "away")
+    _ra={"home":[0,0],"draw":[0,0],"away":[0,0]}
+    for x in log:
+        t=_ot(x); _ra[t][0]+=1; _ra[t][1]+= 1 if x["correct"] else 0
+    reliability={k:(v[1]+1)/(v[0]+2) for k,v in _ra.items()}   # Laplace-smoothed hit rate per outcome
+    _tot=len(log)
+    _brier=(sum(sum((x["probs"][k]-(1 if x["ax"]==k else 0))**2 for k in range(3)) for x in log)/_tot) if _tot else 0.667
+    reliability["kelly"]=max(0.10,min(0.5, 1-_brier/0.667))     # Kelly fraction scaled by Brier skill
     knockout=knockout or KO_TEMPLATE
     resolve=make_resolver(stand,knockout)
     mt,order,finalnum=ko_index(knockout)
     odds,reach=monte_carlo_real(mt,resolve,elo,form,h2h,finalnum)
-    betting=compute_betting(odds_fixtures or [], odds_updated, elo, form, h2h, set(teams), odds)
+    betting=compute_betting(odds_fixtures or [], odds_updated, elo, form, h2h, set(teams), odds, reliability)
     ranked=sorted(odds.items(),key=lambda kv:kv[1],reverse=True)
     champ_team,champ_prob=ranked[0][0],round(ranked[0][1]*100,1)
     fav=champ_team
