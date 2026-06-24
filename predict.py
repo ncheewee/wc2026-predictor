@@ -136,6 +136,14 @@ def compute_betting(fixtures, updated, elo, form, h2h, teamset, title_odds, reli
     rel = reliability or {"home":1.0,"draw":1.0,"away":1.0,"kelly":0.25}
     r_by = [rel.get("home",1.0), rel.get("draw",1.0), rel.get("away",1.0)]
     kelly = rel.get("kelly",0.25)
+    def form_str(t):
+        r=form.get(t,[])[-5:]
+        return "".join("W" if x==3 else ("D" if x==1 else "L") for x in r) or "—"
+    def h2h_str(a,b):
+        key=(a,b) if a<b else (b,a); rec=h2h.get(key)
+        if not rec or sum(rec)==0: return "no prior meetings"
+        aw = rec[0] if a<b else rec[2]; bw = rec[2] if a<b else rec[0]
+        return f"{a} {aw}–{rec[1]}–{bw} {b}"
     matches = []
     for a, b, o in fixtures:
         if a not in teamset or b not in teamset:
@@ -174,10 +182,13 @@ def compute_betting(fixtures, updated, elo, form, h2h, teamset, title_odds, reli
         matches.append({"a": a, "b": b, "odds": [round(x,2) for x in o],
                         "model": [round(x*100) for x in model],
                         "adj": [round(x*100) for x in p_used],
+                        "mktImplied": [round(x*100) for x in fair],
                         "marketFav": names[mkt_fav], "modelFav": names[mdl_fav],
                         "pick": names[bi], "pickIdx": bi, "edge": round(edge*100,1),
                         "rawEdge": round(ev_raw[bi]*100,1), "stars": stars,
-                        "label": label, "note": note})
+                        "conv": round(conv*100,1), "label": label, "note": note,
+                        "formA": form_str(a), "formB": form_str(b),
+                        "eloA": round(elo[a]), "eloB": round(elo[b]), "h2h": h2h_str(a,b)})
     matches.sort(key=lambda m: (-m["stars"], -m["edge"]))
     def lab(edge):
         return "value" if edge >= ODDS_VALUE_EDGE else ("lean" if edge >= 0 else "no-value")

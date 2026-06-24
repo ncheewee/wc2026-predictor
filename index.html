@@ -184,6 +184,20 @@
   .ob .om{font-size:10px;color:var(--faint);display:block}
   .ob.pick .ov{color:var(--teal)}
   .bn{font-size:12px;color:#bcd2ce;line-height:1.5}
+  .bet{cursor:pointer}
+  .bh .chev{margin-left:8px;color:var(--faint);font-size:11px;transition:transform .15s;flex:0 0 auto}
+  .bet.open .chev{transform:rotate(180deg)}
+  .bd-detail{display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+  .bet.open .bd-detail{display:block}
+  .bdtab{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;table-layout:fixed}
+  .bdtab th{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);font-weight:400;text-align:right;padding:4px 8px;border-bottom:1px solid var(--line)}
+  .bdtab th.l,.bdtab td.l{text-align:left}
+  .bdtab td{padding:5px 8px;text-align:right;border-bottom:1px solid rgba(80,220,200,.06);font-variant-numeric:tabular-nums;color:var(--muted)}
+  .bdtab td.l{color:var(--ink);font-weight:500}
+  .bdtab td.hl{color:var(--teal);font-weight:700}
+  .bdstats{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted);margin-bottom:10px}
+  .bdstats b{color:var(--ink);font-weight:500}
+  .bdnote{font-size:12.5px;color:#bcd2ce;line-height:1.55;margin:0}
   .otable{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
   .otable th{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);
     font-weight:400;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
@@ -621,10 +635,27 @@ function renderBetting(){
       return `<div class="ob ${cls}"><span class="ol">${esc(label)}</span><span class="ov">${m.odds[i]}</span><span class="om">model ${m.model[i]}%</span></div>`;
     };
     const chiptxt = m.label==='value' ? (stars(m.stars)+' '+esc(m.pick)) : chip[m.label];
+    const summary = m.label==='value'
+      ? `Value on <b style="color:var(--ink)">${esc(m.pick)}</b> · adj edge +${m.edge}%`
+      : (m.label==='diverge' ? `Model leans ${esc(m.modelFav)}, market likes ${esc(m.marketFav)}`
+                             : `In line with the market (${esc(m.marketFav)})`);
+    const rows = [[m.a,0],['Draw',1],[m.b,2]].map(([lab,i])=>
+      `<tr><td class="l">${esc(lab)}</td><td>${m.odds[i]}</td><td>${m.mktImplied[i]}%</td><td>${m.model[i]}%</td><td class="${i===m.pickIdx?'hl':''}">${m.adj[i]}%</td></tr>`).join('');
     return `<div class="bet ${m.label}">
-      <div class="bh"><b>${esc(m.a)}</b><span class="vs">vs</span><b>${esc(m.b)}</b><span class="vchip ${m.label}">${chiptxt}</span></div>
+      <div class="bh"><b>${esc(m.a)}</b><span class="vs">vs</span><b>${esc(m.b)}</b><span class="vchip ${m.label}">${chiptxt}</span><span class="chev">▾</span></div>
       <div class="o3">${box(0,m.a)}${box(1,'Draw')}${box(2,m.b)}</div>
-      <div class="bn">${esc(m.note)}${m.label==='value'?` <span style="color:var(--faint)">(adj edge +${m.edge}%, raw +${m.rawEdge}%)</span>`:''}</div></div>`;
+      <div class="bn">${summary}</div>
+      <div class="bd-detail">
+        <table class="bdtab"><colgroup><col style="width:34%"><col style="width:16%"><col style="width:18%"><col style="width:16%"><col style="width:16%"></colgroup>
+          <thead><tr><th class="l">Outcome</th><th>Odds</th><th>Market</th><th>Model</th><th>Adj</th></tr></thead><tbody>${rows}</tbody></table>
+        <div class="bdstats">
+          <span><b>${esc(m.a)}</b> · form ${esc(m.formA)} · Elo ${m.eloA}</span>
+          <span><b>${esc(m.b)}</b> · form ${esc(m.formB)} · Elo ${m.eloB}</span>
+          <span>Head-to-head: ${esc(m.h2h)}</span>
+        </div>
+        <p class="bdnote">${esc(m.note)}${m.label==='value'?` <b style="color:var(--teal)">Conviction ${stars(m.stars)}</b> — Kelly stake ${m.conv}% of bank · raw edge +${m.rawEdge}%.`:''}
+        <br><span style="color:var(--faint);font-size:11px">Market = de-vigged implied probability · Model = raw model · Adj = after shrinking to market by earned trust.</span></p>
+      </div></div>`;
   };
   const matches = B.matches && B.matches.length
     ? `<div class="betgrid">${B.matches.map(card).join('')}</div>`
@@ -655,6 +686,7 @@ function renderBetting(){
     <div class="panel" style="padding:4px 12px 10px">
       <table class="otable"><thead><tr><th class="l">Team</th><th>Model</th><th>Fair odds</th><th>Market</th><th>Edge</th></tr></thead>
       <tbody>${B.outright.map(orow).join('')}</tbody></table></div>`;
+  el.addEventListener('click', e=>{ const c=e.target.closest('.bet'); if(c) c.classList.toggle('open'); });
 }
 
 /* SCORECARD */
