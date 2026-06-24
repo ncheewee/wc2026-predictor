@@ -222,8 +222,11 @@ def fetch_openfootball():
                         "round": m.get("round") or stage})
         played += 1
     matches.sort(key=lambda x: x["date"])
-    print(f"[of] groups={len(groups)} teams={len(teamset)} played_matches={played}")
-    return matches, groups
+    knockout = [{"num":m.get("num"),"round":m.get("round"),
+                 "team1":m.get("team1"),"team2":m.get("team2")}
+                for m in mj.get("matches", []) if not m.get("group") and m.get("num")]
+    print(f"[of] groups={len(groups)} teams={len(teamset)} played_matches={played} knockout_slots={len(knockout)}")
+    return matches, groups, knockout
 
 def synth_sample(seed=20260623):
     """Synthesise a completed group stage from BASE_ELO + noise (offline test only)."""
@@ -239,7 +242,7 @@ def synth_sample(seed=20260623):
                             "round":f"Matchday {i//2+1}"})
         md+=4
     matches.sort(key=lambda m:m["date"])
-    return matches, [(k,v) for k,v in GROUPS.items()]
+    return matches, [(k,v) for k,v in GROUPS.items()], list(KO_TEMPLATE)
 
 def elo_of(team):
     return BASE_ELO.get(team, DEFAULT_ELO)
@@ -376,84 +379,166 @@ def standings(matches, groups):
         out.append([g,rows])
     return out
 
-def build_bracket_seed(stand, elo):
-    winners,runners,thirds=[],[],[]
-    for g,rows in stand:
-        winners.append((rows[0][0],g)); runners.append((rows[1][0],g)); thirds.append((rows[2][0],g))
-    thirds.sort(key=lambda tg: elo.get(tg[0],DEFAULT_ELO),reverse=True)
-    qualifiers=winners+runners+thirds[:8]
-    qualifiers.sort(key=lambda tg: elo.get(tg[0],DEFAULT_ELO),reverse=True)
-    teams=[t for t,_ in qualifiers]; grp={t:g for t,g in qualifiers}
-    used=set(); ties=[]; top=teams[:16]; bottom=teams[16:][::-1]
-    for hi in top:
-        if hi in used: continue
-        opp=next((lo for lo in bottom if lo not in used and grp[lo]!=grp[hi]),None)
-        opp=opp or next(lo for lo in bottom if lo not in used)
-        used.add(hi); used.add(opp); ties.append((hi,opp))
-    return ties
+# ----------------------------------------------------------------------------- real bracket
+# Uses the OFFICIAL 2026 knockout template (positional slot codes from openfootball)
+# instead of seeding by Elo — so the path reflects the real draw, not an invented soft half.
+KO_ROUNDS = ["Round of 32","Round of 16","Quarter-final","Semi-final","Final"]
 
-# ----------------------------------------------------------------------------- monte carlo
-def sim_tie(a,b,elo,form,h2h,rng):
-    return a if rng.random()<match_prob(a,b,elo,form,h2h) else b
+# Official 2026 knockout template (slot codes). Fallback for --sample / if live fetch lacks it.
+def _ko(num,rnd,t1,t2): return {"num":num,"round":rnd,"team1":t1,"team2":t2}
+KO_TEMPLATE = [
+    _ko(73,"Round of 32","2A","2B"),_ko(74,"Round of 32","1D","3A/B/C/D/F"),
+    _ko(75,"Round of 32","1F","2C"),_ko(76,"Round of 32","1C","2F"),
+    _ko(77,"Round of 32","1I","3C/D/F/G/H"),_ko(78,"Round of 32","2E","2I"),
+    _ko(79,"Round of 32","1A","3C/E/F/H/I"),_ko(80,"Round of 32","1L","3E/H/I/J/K"),
+    _ko(81,"Round of 32","1E","3B/E/F/I/J"),_ko(82,"Round of 32","1G","3A/E/H/I/J"),
+    _ko(83,"Round of 32","2K","2L"),_ko(84,"Round of 32","1H","2J"),
+    _ko(85,"Round of 32","1B","3E/F/G/I/J"),_ko(86,"Round of 32","1J","2H"),
+    _ko(87,"Round of 32","1K","3D/E/I/J/L"),_ko(88,"Round of 32","2D","2G"),
+    _ko(89,"Round of 16","W74","W77"),_ko(90,"Round of 16","W73","W75"),
+    _ko(91,"Round of 16","W76","W78"),_ko(92,"Round of 16","W79","W80"),
+    _ko(93,"Round of 16","W83","W84"),_ko(94,"Round of 16","W81","W82"),
+    _ko(95,"Round of 16","W86","W88"),_ko(96,"Round of 16","W85","W87"),
+    _ko(97,"Quarter-final","W89","W90"),_ko(98,"Quarter-final","W93","W94"),
+    _ko(99,"Quarter-final","W91","W92"),_ko(100,"Quarter-final","W95","W96"),
+    _ko(101,"Semi-final","W97","W98"),_ko(102,"Semi-final","W99","W100"),
+    _ko(104,"Final","W101","W102"),
+]
 
-def monte_carlo(r32,elo,form,h2h,sims=SIMS,seed=1):
-    rng=random.Random(seed); champ={}
+def make_resolver(stand, knockout):
+    """resolve(code)->team for R32 slot codes: '1A'/'2B' from standings, '3X/Y/..' via a
+    legal assignment of the 8 best third-placed teams, or an already-decided team name."""
+    pos1={g:rows[0][0] for g,rows in stand}
+    pos2={g:rows[1][0] for g,rows in stand}
+    names=set(pos1.values())|set(pos2.values())
+    thirds=[(g,rows[2][0],rows[2][6],rows[2][5]) for g,rows in stand]   # group,team,pts,gd
+    best8=sorted(thirds,key=lambda x:(x[2],x[3]),reverse=True)[:8]
+    third_team={g:t for g,t,_,_ in best8}; qg=set(third_team)
+    slots=[]
+    for m in knockout:
+        if m["round"]!="Round of 32": continue
+        for code in (m["team1"],m["team2"]):
+            if code and code[0]=="3" and "/" in code:
+                slots.append((code,set(code[1:].split("/"))))
+    assign={}; order=sorted(range(len(slots)),key=lambda i:len(slots[i][1]&qg))
+    def bt(i,used):
+        if i==len(order): return True
+        code,allowed=slots[order[i]]
+        for g in sorted(allowed&qg):
+            if g in used: continue
+            used.add(g); assign[code]=g
+            if bt(i+1,used): return True
+            used.discard(g)
+        return False
+    bt(0,set())
+    third_for={code:third_team[g] for code,g in assign.items()}
+    def resolve(code):
+        if not code: return None
+        if code in names or code in third_team.values(): return code
+        if code[0]=="1": return pos1.get(code[1:])
+        if code[0]=="2": return pos2.get(code[1:])
+        if code[0]=="3": return third_for.get(code)
+        return code
+    return resolve
+
+def ko_index(knockout):
+    """Return (mt, order, finalnum): match map, planar top-to-bottom position per match
+    (so bracket connectors line up), and the final's match number."""
+    mt={m["num"]:m for m in knockout if m["round"] in KO_ROUNDS}
+    finalnum=max(mt)
+    seq=[]
+    def visit(num):
+        m=mt.get(num)
+        if not m: return
+        f=[int(c[1:]) for c in (m["team1"],m["team2"]) if c and c[0]=="W"]
+        if not f: seq.append(num); return
+        for fn in f: visit(fn)
+    visit(finalnum)
+    leaf={num:i for i,num in enumerate(seq)}
+    def pos(num):
+        m=mt[num]; f=[int(c[1:]) for c in (m["team1"],m["team2"]) if c and c[0]=="W"]
+        return leaf[num] if not f else sum(pos(x) for x in f)/len(f)
+    return mt, {n:pos(n) for n in mt}, finalnum
+
+def _side(code,res,resolve):
+    if not code: return None
+    if code[0]=="W": return res.get(int(code[1:]))
+    if code[0]=="L": return None
+    return resolve(code)
+
+def simulate_bracket(mt, resolve, elo,form,h2h, pick):
+    res={}; parts={r:set() for r in KO_ROUNDS}
+    for num in sorted(mt):
+        m=mt[num]; a=_side(m["team1"],res,resolve); b=_side(m["team2"],res,resolve)
+        if not a or not b: continue
+        parts[m["round"]].add(a); parts[m["round"]].add(b); res[num]=pick(a,b)
+    return res,parts
+
+def monte_carlo_real(mt, resolve, elo,form,h2h, finalnum, sims=SIMS, seed=1):
+    rng=random.Random(seed); champ={}; reach={r:{} for r in KO_ROUNDS}
+    pk=lambda a,b: a if rng.random()<match_prob(a,b,elo,form,h2h) else b
     for _ in range(sims):
-        rd=list(r32)
-        while len(rd)>1:
-            nxt=[sim_tie(a,b,elo,form,h2h,rng) for a,b in rd]
-            rd=[(nxt[i],nxt[i+1]) for i in range(0,len(nxt),2)]
-        a,b=rd[0]; w=sim_tie(a,b,elo,form,h2h,rng); champ[w]=champ.get(w,0)+1
-    return {t:c/sims for t,c in champ.items()}
+        res,parts=simulate_bracket(mt,resolve,elo,form,h2h,pk)
+        for r in KO_ROUNDS:
+            for t in parts[r]: reach[r][t]=reach[r].get(t,0)+1
+        w=res.get(finalnum)
+        if w: champ[w]=champ.get(w,0)+1
+    title={t:c/sims for t,c in champ.items()}
+    reachp={r:{t:c/sims for t,c in d.items()} for r,d in reach.items()}
+    return title, reachp
 
-def projected_path(r32,elo,form,h2h):
-    def advance(ties):
-        winners=[a if match_prob(a,b,elo,form,h2h)>=0.5 else b for a,b in ties]
-        return winners,[(winners[i],winners[i+1]) for i in range(0,len(winners)-1,2)]
-    fav=max(elo,key=elo.get)
-    labels=["R32","R16","QF","SF","FIN"]; ties=list(r32); path=[]; level=0
-    while ties:
-        my=next(((a,b) for a,b in ties if fav in (a,b)),None)
-        if my is None: break
-        opp=my[1] if my[0]==fav else my[0]
-        p=round(match_prob(fav,opp,elo,form,h2h)*100)
-        if labels[level]!="R32":
-            path.append({"round":labels[level],"opp":opp,
-                         "note":"likely opponent" if labels[level]=="R16" else "projected","pct":p})
-        winners,ties=advance(ties)
-        if len(winners)==1: break
-        level+=1
-        if level>=len(labels): break
-    return fav,path
-
-def build_bracket_view(r32,elo,form,h2h,fav):
-    def pack(a,b):
-        p=match_prob(a,b,elo,form,h2h)
-        return [a,b,0,round(p*100)] if p>=0.5 else [a,b,1,round((1-p)*100)]
-    rounds=[]; names=["Round of 32","Round of 16","Quarter-finals","Semi-finals","Final"]; ties=list(r32)
-    for name in names:
-        packed=[]; winners=[]
-        for a,b in ties:
-            pk=pack(a,b); w=pk[0] if pk[2]==0 else pk[1]
-            packed.append(pk+[1 if fav in (a,b) else 0]); winners.append(w)
-        rounds.append({"name":name,"ties":packed})
-        if len(winners)==1: break
-        ties=[(winners[i],winners[i+1]) for i in range(0,len(winners),2)]
-    return rounds
+def projected_bracket(mt, order, resolve, elo,form,h2h, finalnum, champ):
+    """Deterministic favourite-advances view, but force the headline champion along its
+    real-template path so the highlighted route is consistent with the title pick."""
+    det,_=simulate_bracket(mt,resolve,elo,form,h2h, lambda a,b: a if match_prob(a,b,elo,form,h2h)>=0.5 else b)
+    parent={}
+    for n,m in mt.items():
+        for c in (m["team1"],m["team2"]):
+            if c and c[0]=="W": parent[int(c[1:])]=n
+    champ_r32=next((n for n,m in mt.items() if m["round"]=="Round of 32"
+                    and champ in (resolve(m["team1"]),resolve(m["team2"]))), None)
+    onpath=set(); cur=champ_r32
+    while cur is not None: onpath.add(cur); cur=parent.get(cur)
+    res=dict(det)
+    for n in onpath: res[n]=champ
+    rounds=[]; clabel={"Round of 16":"R16","Quarter-final":"QF","Semi-final":"SF","Final":"FIN"}; cpath=[]
+    for rname in KO_ROUNDS:
+        nums=sorted([n for n in mt if mt[n]["round"]==rname], key=lambda n:order[n])
+        ties=[]
+        for n in nums:
+            m=mt[n]; a=_side(m["team1"],res,resolve); b=_side(m["team2"],res,resolve)
+            if not a or not b: ties.append(["TBD","TBD",0,0,0]); continue
+            if n in onpath:
+                opp=b if a==champ else a
+                p=match_prob(champ,opp,elo,form,h2h); w=0 if a==champ else 1
+                ties.append([a,b,w,round(p*100),1])   # p is the champion's win prob
+                if rname in clabel:
+                    cpath.append({"round":clabel[rname],"opp":opp,
+                                  "note":"likely opponent" if rname=="Round of 16" else "projected",
+                                  "pct":round(match_prob(champ,opp,elo,form,h2h)*100)})
+            else:
+                p=match_prob(a,b,elo,form,h2h); w=0 if p>=0.5 else 1
+                ties.append([a,b,w,round((p if w==0 else 1-p)*100),0])
+        rounds.append({"name":rname,"ties":ties})
+    return rounds,cpath
 
 # ----------------------------------------------------------------------------- assemble + inject
-def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
+def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None, knockout=None):
     teams=[t for _,ts in groups for t in ts]
     elo,form,h2h,feed,log,snaps=build_signals(matches,teams)
     stand=standings(matches,groups)
-    r32=build_bracket_seed(stand,elo)
-    odds=monte_carlo(r32,elo,form,h2h)
+    knockout=knockout or KO_TEMPLATE
+    resolve=make_resolver(stand,knockout)
+    mt,order,finalnum=ko_index(knockout)
+    odds,reach=monte_carlo_real(mt,resolve,elo,form,h2h,finalnum)
     betting=compute_betting(odds_fixtures or [], odds_updated, elo, form, h2h, set(teams), odds)
     ranked=sorted(odds.items(),key=lambda kv:kv[1],reverse=True)
-    fav,path=projected_path(r32,elo,form,h2h)
     champ_team,champ_prob=ranked[0][0],round(ranked[0][1]*100,1)
+    fav=champ_team
     contenders=[{"team":t,"prob":round(p*100,1)} for t,p in ranked[:6]]
-    bracket_rounds=build_bracket_view(r32,elo,form,h2h,fav)
+    bracket_rounds,path=projected_bracket(mt,order,resolve,elo,form,h2h,finalnum,champ_team)
+    reach_final=round(reach["Final"].get(champ_team,0)*100,1)
+    reach_sf=round(reach["Semi-final"].get(champ_team,0)*100,1)
 
     # ---- Scorecard: prediction accuracy (walk-forward) ----
     total=len(log); correct=sum(1 for x in log if x["correct"])
@@ -485,11 +570,15 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
                         "pct":round(sum(1 for x in sub if x["correct"])/len(sub)*100) if sub else None})
     draw_cal={"predicted":round(sum(x["probs"][1] for x in log)/total*100) if total else 0,
               "actual":round(draws["actual"]/total*100) if total else 0}
-    # ---- title-odds evolution: re-simulate each rating snapshot ----
+    # ---- title-odds evolution: re-simulate each rating snapshot (cap snapshots for speed) ----
+    evo_snaps=snaps
+    if len(snaps)>8:
+        idx=sorted(set([0]+[round(i*(len(snaps)-1)/7) for i in range(1,8)]))
+        evo_snaps=[snaps[i] for i in idx]
     evolution=[]
-    for label,snap in snaps:
+    for label,snap in evo_snaps:
         e,f,hh=snap
-        od=monte_carlo(r32,e,f,hh,sims=2500,seed=7)
+        od,_=monte_carlo_real(mt,resolve,e,f,hh,finalnum,sims=1500,seed=7)
         rk=sorted(od.items(),key=lambda kv:kv[1],reverse=True)
         cpos=next((i+1 for i,(t,_) in enumerate(rk) if t==champ_team),None)
         evolution.append({"stage":label,"leader":rk[0][0],"leaderProb":round(rk[0][1]*100,1),
@@ -543,7 +632,8 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None):
                    f"{second}. Confidence falls in the late rounds, where ties tighten toward coin flips. "
                    "Every output is a probability, not a certainty."),
       "path":path,
-      "bracket":{"rounds":bracket_rounds,"champion":{"team":champ_team,"flag":FLAGS.get(champ_team,""),"prob":champ_prob}},
+      "bracket":{"rounds":bracket_rounds,"champion":{"team":champ_team,"flag":FLAGS.get(champ_team,""),
+                 "prob":champ_prob,"reachFinal":reach_final,"reachSemi":reach_sf}},
       "ingest":{"lastFetch":now.strftime("%H:%M UTC"),"ago":"just now" if live else "1h 52m ago",
                 "groupPlayed":gp,"groupTotal":72,"koPlayed":kp,"koTotal":32,
                 "teamsMatched":len(set(teams)),"teamsTotal":48,
@@ -575,16 +665,16 @@ def main():
     assert abs(sum(WEIGHTS.values())-1.0)<1e-9,"weights must sum to 1"
     odds_fixtures, odds_updated = [], None
     if args.sample:
-        matches,groups=synth_sample(); live=False
+        matches,groups,knockout=synth_sample(); live=False
     else:
         res=fetch_openfootball()
         if not res:
             print("WARNING: openfootball unavailable — deploying synthesised seed data.")
-            matches,groups=synth_sample(); live=False
+            matches,groups,knockout=synth_sample(); live=False
         else:
-            matches,groups=res; live=True
+            matches,groups,knockout=res; live=True
             odds_fixtures, odds_updated = fetch_odds()
-    data=assemble(matches,groups,live,odds_fixtures,odds_updated)
+    data=assemble(matches,groups,live,odds_fixtures,odds_updated,knockout)
     if args.dump: json.dump(data,open(args.dump,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
     inject(args.out,data)
     print(f"OK · champion {data['champion']['team']} {data['champion']['prob']}% · "

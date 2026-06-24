@@ -490,7 +490,8 @@ function renderBracket(){
     <div class="round pl"><div class="tie"><div class="champcard">
       <div class="tr">🏆</div><div class="fl">${B.champion.flag||''}</div>
       <div class="cn">${esc(B.champion.team)}</div>
-      <div class="co">${B.champion.prob}%</div><div class="cl">Title odds</div></div></div></div></div>`;
+      <div class="co">${B.champion.prob}%</div><div class="cl">Title odds</div>
+      ${B.champion.reachFinal!=null?`<div class="cl" style="margin-top:8px;text-transform:none;letter-spacing:0;color:var(--muted)">${B.champion.reachFinal}% to reach final</div>`:''}</div></div></div></div>`;
   document.getElementById('tab-bracket').innerHTML = `
     <div class="legend">
       <span><span class="sw" style="background:var(--teal)"></span>High confidence (≥70%)</span>
@@ -499,7 +500,7 @@ function renderBracket(){
       <span><span class="pathkey"></span>Predicted champion's path</span>
     </div>
     <div class="scroller"><div class="bracket">${cols}</div></div>
-    <p class="note"><b>Reading the bracket:</b> each card shows the model's projected winner (highlighted, with win probability) for that tie. Win % is per match-up, not cumulative — the chance of the trophy is the product of surviving every round. Numbers refresh automatically as results land.</p>`;
+    <p class="note"><b>Reading the bracket:</b> this is the <b>official 2026 draw</b> (real slot template), not a seeded guess — each card shows the model's projected winner for that tie, with the per-match win %. Win % is per match-up, not cumulative: a deep run is a chain of these, which is why even a strong team's chance of <i>reaching</i> the final${B.champion.reachFinal!=null?` (${esc(B.champion.team)}: ${B.champion.reachFinal}%)`:''} is far below any single-tie number. Refreshes as results land.</p>`;
 }
 
 /* DATA */
