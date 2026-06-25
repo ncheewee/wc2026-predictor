@@ -210,9 +210,9 @@ def compute_betting(fixtures, updated, elo, form, h2h, teamset, title_odds, reli
         "matches": matches, "outright": outright, "outrightNote": OUTRIGHT_AS_OF,
         "trust": {"home":round(r_by[0]*100),"draw":round(r_by[1]*100),"away":round(r_by[2]*100),
                   "kelly":round(kelly*100)},
-        "method": ("Value is shrunk toward the market by how reliable the model has actually been "
-                   "on each outcome (home/draw/away), then sized by fractional Kelly into a 0–3★ "
-                   "conviction. Trust and Kelly fraction are set by the model's own track record."),
+        "method": ("Each pick is shrunk toward the market by how much you trust the model on that "
+                   "outcome, then sized into a 0–3★ conviction by the stake-size dial. The defaults "
+                   "below come from the model's own track record — drag to set your own (resets on reload)."),
         "disclaimer": ("For analysis and entertainment only — not betting advice. Odds move "
                        "constantly; always verify on Singapore Pools before acting. Sports betting "
                        "in Singapore is 21+ and legal only via Singapore Pools. If gambling may be "
