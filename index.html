@@ -205,25 +205,36 @@
   .modal .mclose{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
   .modal .mh{font-family:var(--disp);font-size:18px;font-weight:700;margin:0 0 4px;padding-right:30px}
   .modal .msub{font-size:12.5px;color:var(--teal);margin:0 0 16px}
-  .seg{display:inline-flex;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;padding:4px;margin:2px 0 16px}
-  .seg button{font-family:var(--disp);font-size:12px;letter-spacing:.04em;color:var(--muted);background:none;border:none;padding:7px 18px;border-radius:7px;cursor:pointer}
-  .seg button.on{background:var(--teal);color:var(--bg);font-weight:700}
-  .fxday{font-family:var(--disp);font-size:12px;letter-spacing:.06em;color:var(--sky);margin:18px 0 8px}
-  .fxrow{display:grid;grid-template-columns:54px 1fr auto;gap:12px;align-items:center;padding:9px 14px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:7px;backdrop-filter:blur(8px)}
-  .fxt{font-family:var(--mono);font-size:12px;color:var(--muted)}
-  .fxm{font-size:14px}.fxm b{font-weight:600}.fxm span{color:var(--faint);font-size:12px;margin:0 5px}
-  .fxp{text-align:right;font-size:12.5px;color:var(--muted);white-space:nowrap}.fxp b{color:var(--teal);font-weight:600}
-  .fxbar{grid-column:1/-1;display:flex;height:6px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.05);margin-top:2px}
-  .fxbar i{display:block;height:100%}
-  .fxp .odd{color:var(--ink);font-weight:600;margin-left:6px}
-  .betsim{grid-column:1/-1;display:flex;gap:6px;margin-top:9px}
-  .bchip{font-family:var(--disp);font-size:10.5px;letter-spacing:.03em;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:20px;padding:4px 12px;cursor:pointer}
-  .bchip.act[data-s="hit"]{background:var(--teal);color:var(--bg);border-color:var(--teal);font-weight:700}
-  .bchip.act[data-s="miss"]{background:var(--red);color:#fff;border-color:var(--red);font-weight:700}
-  .bchip.act[data-s=""]{background:rgba(255,255,255,.1);color:var(--ink)}
-  .fxday{display:flex;align-items:baseline;justify-content:space-between}
-  .daytally{font-family:var(--sans);font-size:12.5px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)}
-  .daytally b{font-family:var(--disp)}
+  /* mode toggle (two big buttons) */
+  .modes{display:flex;gap:14px;width:80%;margin:2px auto 6px}
+  .modes button{flex:1;font-family:var(--disp);font-size:18px;letter-spacing:.04em;padding:18px 0;border-radius:14px;cursor:pointer;background:rgba(255,255,255,.03);border:1px solid var(--line);color:var(--muted);transition:all .12s}
+  .modes button .sub{display:block;font-family:var(--sans);font-size:11.5px;font-weight:400;letter-spacing:0;margin-top:5px;opacity:.85}
+  .modes button.on{background:linear-gradient(180deg,rgba(42,240,200,.22),rgba(42,240,200,.07));border-color:var(--teal);color:var(--ink);box-shadow:0 0 22px rgba(42,240,200,.16)}
+  .modes button.on .sub{color:var(--teal);opacity:1}
+  .pintro{font-size:12.5px;color:var(--muted);text-align:center;margin:14px auto 20px;max-width:80%}
+  .pintro b{color:var(--ink)}.pintro a{color:var(--sky)}
+  /* aligned fixture grid */
+  .pcols{--g:62px 1fr 128px 58px 150px}
+  .chead{display:grid;grid-template-columns:var(--g);gap:14px;padding:0 16px 8px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .chead .r{text-align:right}.chead .c{text-align:center}
+  .fxday{font-family:var(--disp);font-size:12px;letter-spacing:.06em;color:var(--sky);margin:18px 0 8px;padding-left:4px}
+  .row{display:grid;grid-template-columns:var(--g);gap:14px;align-items:center;padding:11px 16px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:7px}
+  .row .t{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .row .m{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row .m b{font-weight:600}.row .m span{color:var(--faint);font-size:12px;margin:0 5px}
+  .row .pk{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row .pk b{color:var(--teal);font-weight:600}
+  .row .od{font-family:var(--disp);font-size:14px;text-align:right;color:var(--ink)}.row .od.none{color:var(--faint);font-family:var(--sans);font-size:12px}
+  .sim{display:flex;gap:5px;justify-content:flex-end}
+  .ch{font-family:var(--disp);font-size:11px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:18px;padding:5px 0;width:44px;text-align:center;cursor:pointer}
+  .ch.act[data-s="hit"]{background:var(--teal);color:var(--bg);border-color:var(--teal);font-weight:700}
+  .ch.act[data-s="miss"]{background:var(--red);color:#fff;border-color:var(--red);font-weight:700}
+  .ch.act[data-s=""]{background:rgba(255,255,255,.1);color:var(--ink)}
+  .simoff{justify-self:end;color:var(--faint);font-size:11px;font-family:var(--mono)}
+  .tally{display:grid;grid-template-columns:var(--g);gap:14px;padding:8px 16px 2px}
+  .tally .lab{grid-column:1/4;font-size:12px;color:var(--faint);align-self:center}
+  .tally .val{grid-column:4/6;text-align:right;font-size:13px;color:var(--muted)}
+  .tally .val b{font-family:var(--disp);font-size:16px}
+  .tpos{color:var(--teal)}.tneg{color:var(--red)}
+  @media(max-width:640px){.pcols{--g:46px 1fr 56px 132px}.row .pk,.chead .cpk{display:none}.modes{width:100%}}
   .otable{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
   .otable th{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);
     font-weight:400;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
@@ -694,37 +705,44 @@ function renderBetting(){
     <td>${o.fairOdds??'—'}</td><td>${o.marketOdds??'—'}</td>
     <td class="ev ${o.label||''}">${o.edge==null?'—':((o.edge>=0?'+':'')+o.edge+'%')}</td></tr>`;
   const tr = B.trust;
-  // forward-look predictions list (chronological, grouped by day)
+  // forward-look predictions: aligned grid, grouped by day, with bet simulator
   const FX = DATA.fixtures || [];
-  let pred='', curDate='';
+  let body='', curDate='';
+  const closeDay = d => `<div class="tally"><span class="lab">Day P/L · 1 unit a bet</span><span class="val" data-day-tally="${esc(d)}">no bets yet</span></div></div>`;
   FX.forEach(f=>{
-    const day=(f.sgt||'').split('·')[0].trim(), time=((f.sgt||'').split('·')[1]||'').trim();
-    if(f.date!==curDate){ curDate=f.date;
-      pred+=`<div class="fxday"><span>${esc(day||f.date)}</span><span class="daytally" data-day="${esc(f.date)}"></span></div>`; }
+    if(f.date!==curDate){
+      if(curDate) body+=closeDay(curDate);
+      curDate=f.date;
+      const day=(f.sgt||'').split('·')[0].trim();
+      body+=`<div class="fxday">${esc(day||f.date)}</div><div class="day" data-day="${esc(f.date)}">`;
+    }
     const id=f.date+'|'+f.a+'|'+f.b;
-    const oddTxt=f.pickOdds?`<span class="odd">@ ${f.pickOdds}</span>`:'';
-    const sim=f.pickOdds?`<div class="betsim" data-id="${esc(id)}">
-        <button class="bchip" data-s="">— no bet</button>
-        <button class="bchip" data-s="hit">✓ hit</button>
-        <button class="bchip" data-s="miss">✗ miss</button></div>`:'';
-    pred+=`<div class="fxrow" data-id="${esc(id)}" data-day="${esc(f.date)}" data-odds="${f.pickOdds||0}">
-      <div class="fxt">${esc(time||'—')}</div>
-      <div class="fxm"><b>${esc(f.a)}</b><span>v</span><b>${esc(f.b)}</b></div>
-      <div class="fxp">${esc(f.pick)} <b>${f.pickPct}%</b>${oddTxt}</div>
-      <div class="fxbar" title="${esc(f.a)} ${f.probs[0]}% · Draw ${f.probs[1]}% · ${esc(f.b)} ${f.probs[2]}%">
-        <i style="width:${f.probs[0]}%;background:var(--teal)"></i><i style="width:${f.probs[1]}%;background:#3a5560"></i><i style="width:${f.probs[2]}%;background:var(--sky)"></i></div>
-      ${sim}
+    const od=f.pickOdds?`<span class="od">${f.pickOdds}</span>`:`<span class="od none">—</span>`;
+    const sim=f.pickOdds
+      ? `<span class="sim" data-id="${esc(id)}"><span class="ch" data-s="">–</span><span class="ch" data-s="hit">Hit</span><span class="ch" data-s="miss">Miss</span></span>`
+      : `<span class="simoff">no line</span>`;
+    body+=`<div class="row" data-id="${esc(id)}" data-odds="${f.pickOdds||0}">
+      <span class="t">${esc(time(f)||'—')}</span>
+      <span class="m"><b>${esc(f.a)}</b><span>v</span><b>${esc(f.b)}</b></span>
+      <span class="pk" title="${esc(f.a)} ${f.probs[0]}% · Draw ${f.probs[1]}% · ${esc(f.b)} ${f.probs[2]}%"><b>${esc(f.pick)}</b> ${f.pickPct}%</span>
+      ${od}${sim}
     </div>`;
   });
-  const predictions = pred
-    ? `<p class="betsrc">The forward look — model's pick for every upcoming fixture (kickoffs SGT), with Singapore Pools odds. Tick <b style="color:var(--teal)">hit</b> / <b style="color:var(--red)">miss</b> to simulate a day's bets — net profit at 1 unit/bet: a hit returns its odds (profit = odds − 1), a miss loses the stake (−1). Saved in your browser. Mirrors the <a data-goto="scorecard" href="#">Scorecard</a>.</p>
-       <div class="legend2"><span><b style="background:var(--teal)"></b>Home win</span><span><b style="background:#3a5560"></b>Draw</span><span><b style="background:var(--sky)"></b>Away win</span></div>${pred}`
-    : `<div class="panel"><div class="empty"><div class="ei">◌</div><p><b>No upcoming fixtures with confirmed teams.</b></p><p>Predictions appear here for scheduled matches once both teams are known.</p></div></div>`;
+  if(curDate) body+=closeDay(curDate);
+  function time(f){ return ((f.sgt||'').split('·')[1]||'').trim(); }
+  const predictions = body
+    ? `<p class="pintro">Model's pick for every upcoming fixture (kickoffs <b>SGT</b>) with Singapore Pools odds. Tick <b style="color:var(--teal)">Hit</b> / <b style="color:var(--red)">Miss</b> to simulate a day — net P/L at 1 unit a bet (hit = odds−1, miss = −1), saved in your browser. The forward mirror of the <a data-goto="scorecard" href="#">Scorecard</a>.</p>
+       <div class="pcols"><div class="chead"><span>Time</span><span>Match</span><span class="cpk">Model pick</span><span class="r">SP odds</span><span class="c">Bet</span></div>${body}</div>`
+    : `<div class="panel"><div class="empty"><div class="ei">◌</div><p><b>No upcoming fixtures with confirmed teams.</b></p><p>Predictions appear here once both teams are known.</p></div></div>`;
   el.innerHTML = `
     <div class="disc"><b>⚠ Not betting advice.</b> ${esc(B.disclaimer)}</div>
     <p class="betsrc">Odds: ${esc(B.source)} · updated ${esc(B.oddsUpdated)}</p>
-    <div class="seg" id="betseg"><button class="on" data-v="value">Value</button><button data-v="predictions">Predictions</button></div>
-    <div id="bet-value">
+    <div class="modes" id="modes">
+      <button data-v="predictions" class="on">PREDICTIONS<span class="sub">model pick for every upcoming match</span></button>
+      <button data-v="value">VALUE<span class="sub">where the model beats the odds</span></button>
+    </div>
+    <div id="bet-predictions">${predictions}</div>
+    <div id="bet-value" class="hide">
       ${B.method?`<div class="panel" style="padding:14px 18px;margin-bottom:14px">
         <p style="font-size:13px;color:#bcd2ce;margin:0 0 ${tr?'12px':'0'};line-height:1.6">${esc(B.method)}</p>
         ${tr?`<div class="obreak" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))">
@@ -739,46 +757,44 @@ function renderBetting(){
         <span><b style="background:#3a5560"></b>In line with market</span></div>
       ${matches}
     </div>
-    <div id="bet-predictions" class="hide">${predictions}</div>
     <h2 class="sec">Outright winner — model vs market</h2>
     <p class="betsrc">Market column: ${esc(B.outrightNote)}. Fair odds = 1 ÷ model probability.</p>
     <div class="panel" style="padding:4px 12px 10px">
       <table class="otable"><thead><tr><th class="l">Team</th><th>Model</th><th>Fair odds</th><th>Market</th><th>Edge</th></tr></thead>
       <tbody>${B.outright.map(orow).join('')}</tbody></table></div>
     <div class="modal-bg" id="betModal"><div class="modal"><button class="mclose" aria-label="Close">✕</button><div id="betModalBody"></div></div></div>`;
-  el.querySelector('#betseg').addEventListener('click', e=>{
+  el.querySelector('#modes').addEventListener('click', e=>{
     const btn=e.target.closest('button'); if(!btn) return;
-    el.querySelectorAll('#betseg button').forEach(x=>x.classList.toggle('on',x===btn));
-    el.querySelector('#bet-value').classList.toggle('hide', btn.dataset.v!=='value');
+    el.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x===btn));
     el.querySelector('#bet-predictions').classList.toggle('hide', btn.dataset.v!=='predictions');
+    el.querySelector('#bet-value').classList.toggle('hide', btn.dataset.v!=='value');
   });
   // ---- daily bet simulator (persisted in browser) ----
   const bkey = id => 'wc26bet:'+id;
   const getS = id => { try{ return localStorage.getItem(bkey(id))||''; }catch(e){ return ''; } };
   const setS = (id,s) => { try{ s?localStorage.setItem(bkey(id),s):localStorage.removeItem(bkey(id)); }catch(e){} };
-  const dsel = d => '.fxrow[data-day="'+(window.CSS&&CSS.escape?CSS.escape(d):d)+'"]';
-  function recalcDay(day){
-    let tally=0,hit=0,miss=0;
-    el.querySelectorAll(dsel(day)).forEach(r=>{ const s=getS(r.dataset.id);
-      if(s==='hit'){ tally+=(parseFloat(r.dataset.odds)||0)-1; hit++; }   // net profit = odds − stake
-      else if(s==='miss'){ tally-=1; miss++; } });
-    const t=el.querySelector('.daytally[data-day="'+(window.CSS&&CSS.escape?CSS.escape(day):day)+'"]');
+  function recalcDay(dayEl){
+    let pl=0,hit=0,miss=0;
+    dayEl.querySelectorAll('.row').forEach(r=>{ const s=getS(r.dataset.id);
+      if(s==='hit'){ pl+=(parseFloat(r.dataset.odds)||0)-1; hit++; }   // net = odds − stake
+      else if(s==='miss'){ pl-=1; miss++; } });
+    const t=dayEl.querySelector('[data-day-tally]');
     if(t) t.innerHTML=(hit||miss)
-      ? `${hit} hit · ${miss} miss → <b style="color:${tally>=0?'var(--teal)':'var(--red)'}">${tally>=0?'+':''}${tally.toFixed(2)}</b> units`
+      ? `${hit} hit · ${miss} miss → <b class="${pl>=0?'tpos':'tneg'}">${pl>=0?'+':''}${pl.toFixed(2)}</b> u`
       : '<span style="color:var(--faint)">no bets yet</span>';
   }
-  el.querySelectorAll('.betsim').forEach(sim=>{ const s=getS(sim.dataset.id);
-    sim.querySelectorAll('.bchip').forEach(c=>c.classList.toggle('act',c.dataset.s===s)); });
-  el.querySelectorAll('.daytally').forEach(t=>recalcDay(t.dataset.day));
-  el.addEventListener('click', e=>{ const chip=e.target.closest('.bchip'); if(!chip) return;
-    const sim=chip.closest('.betsim'); setS(sim.dataset.id, chip.dataset.s);
-    sim.querySelectorAll('.bchip').forEach(c=>c.classList.toggle('act',c===chip));
-    recalcDay(chip.closest('.fxrow').dataset.day); });
-  const modal = el.querySelector('#betModal'), body = el.querySelector('#betModalBody');
+  el.querySelectorAll('.sim').forEach(sim=>{ const s=getS(sim.dataset.id);
+    sim.querySelectorAll('.ch').forEach(c=>c.classList.toggle('act',c.dataset.s===s)); });
+  el.querySelectorAll('.day').forEach(d=>recalcDay(d));
+  el.addEventListener('click', e=>{ const ch=e.target.closest('.ch'); if(!ch) return;
+    const sim=ch.closest('.sim'); setS(sim.dataset.id, ch.dataset.s);
+    sim.querySelectorAll('.ch').forEach(c=>c.classList.toggle('act',c===ch));
+    recalcDay(ch.closest('.day')); });
+  const modal = el.querySelector('#betModal'), mbody = el.querySelector('#betModalBody');
   el.addEventListener('click', e=>{
     if(e.target.closest('.mclose') || e.target===modal){ modal.classList.remove('open'); return; }
     const c = e.target.closest('.bet');
-    if(c){ body.innerHTML = detailHTML(B.matches[+c.dataset.idx]); modal.classList.add('open'); }
+    if(c){ mbody.innerHTML = detailHTML(B.matches[+c.dataset.idx]); modal.classList.add('open'); }
   });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') modal.classList.remove('open'); });
 }
