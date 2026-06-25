@@ -205,6 +205,16 @@
   .modal .mclose{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
   .modal .mh{font-family:var(--disp);font-size:18px;font-weight:700;margin:0 0 4px;padding-right:30px}
   .modal .msub{font-size:12.5px;color:var(--teal);margin:0 0 16px}
+  .seg{display:inline-flex;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;padding:4px;margin:2px 0 16px}
+  .seg button{font-family:var(--disp);font-size:12px;letter-spacing:.04em;color:var(--muted);background:none;border:none;padding:7px 18px;border-radius:7px;cursor:pointer}
+  .seg button.on{background:var(--teal);color:var(--bg);font-weight:700}
+  .fxday{font-family:var(--disp);font-size:12px;letter-spacing:.06em;color:var(--sky);margin:18px 0 8px}
+  .fxrow{display:grid;grid-template-columns:54px 1fr auto;gap:12px;align-items:center;padding:9px 14px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:7px;backdrop-filter:blur(8px)}
+  .fxt{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .fxm{font-size:14px}.fxm b{font-weight:600}.fxm span{color:var(--faint);font-size:12px;margin:0 5px}
+  .fxp{text-align:right;font-size:12.5px;color:var(--muted);white-space:nowrap}.fxp b{color:var(--teal);font-weight:600}
+  .fxbar{grid-column:1/-1;display:flex;height:6px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.05);margin-top:2px}
+  .fxbar i{display:block;height:100%}
   .otable{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
   .otable th{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);
     font-weight:400;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
@@ -675,28 +685,56 @@ function renderBetting(){
     <td>${o.fairOdds??'—'}</td><td>${o.marketOdds??'—'}</td>
     <td class="ev ${o.label||''}">${o.edge==null?'—':((o.edge>=0?'+':'')+o.edge+'%')}</td></tr>`;
   const tr = B.trust;
+  // forward-look predictions list (chronological, grouped by day)
+  const FX = DATA.fixtures || [];
+  let pred='', curDay='';
+  FX.forEach(f=>{
+    const day=(f.sgt||'').split('·')[0].trim(), time=((f.sgt||'').split('·')[1]||'').trim();
+    if(day && day!==curDay){ curDay=day; pred+=`<div class="fxday">${esc(day)}</div>`; }
+    pred+=`<div class="fxrow">
+      <div class="fxt">${esc(time||'—')}</div>
+      <div class="fxm"><b>${esc(f.a)}</b><span>v</span><b>${esc(f.b)}</b></div>
+      <div class="fxp">${esc(f.pick)} <b>${f.pickPct}%</b></div>
+      <div class="fxbar" title="${esc(f.a)} ${f.probs[0]}% · Draw ${f.probs[1]}% · ${esc(f.b)} ${f.probs[2]}%">
+        <i style="width:${f.probs[0]}%;background:var(--teal)"></i><i style="width:${f.probs[1]}%;background:#3a5560"></i><i style="width:${f.probs[2]}%;background:var(--sky)"></i></div>
+    </div>`;
+  });
+  const predictions = pred
+    ? `<p class="betsrc">The forward look — the model's most-likely outcome for every upcoming fixture (kickoffs in SGT). The live counterpart to the <a data-goto="scorecard" href="#">Scorecard</a>'s past hits &amp; misses.</p>
+       <div class="legend2"><span><b style="background:var(--teal)"></b>Home win</span><span><b style="background:#3a5560"></b>Draw</span><span><b style="background:var(--sky)"></b>Away win</span></div>${pred}`
+    : `<div class="panel"><div class="empty"><div class="ei">◌</div><p><b>No upcoming fixtures with confirmed teams.</b></p><p>Predictions appear here for scheduled matches once both teams are known.</p></div></div>`;
   el.innerHTML = `
     <div class="disc"><b>⚠ Not betting advice.</b> ${esc(B.disclaimer)}</div>
     <p class="betsrc">Odds: ${esc(B.source)} · updated ${esc(B.oddsUpdated)}</p>
-    ${B.method?`<div class="panel" style="padding:14px 18px;margin-bottom:14px">
-      <p style="font-size:13px;color:#bcd2ce;margin:0 0 ${tr?'12px':'0'};line-height:1.6">${esc(B.method)}</p>
-      ${tr?`<div class="obreak" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))">
-        <div class="cstat"><div class="cl">Trust · home win</div><div class="cvv">${tr.home}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
-        <div class="cstat"><div class="cl">Trust · draw</div><div class="cvv">${tr.draw}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
-        <div class="cstat"><div class="cl">Trust · away win</div><div class="cvv">${tr.away}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
-        <div class="cstat"><div class="cl">Kelly fraction</div><div class="cvv">${tr.kelly}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
-      </div>`:''}</div>`:''}
-    <h2 class="sec">Upcoming matches — confidence-balanced value</h2>
-    <div class="legend2"><span style="color:var(--teal)">★★★ conviction (edge × earned trust × Kelly)</span>
-      <span><b style="background:var(--amber)"></b>Model differs from market</span>
-      <span><b style="background:#3a5560"></b>In line with market</span></div>
-    ${matches}
+    <div class="seg" id="betseg"><button class="on" data-v="value">Value</button><button data-v="predictions">Predictions</button></div>
+    <div id="bet-value">
+      ${B.method?`<div class="panel" style="padding:14px 18px;margin-bottom:14px">
+        <p style="font-size:13px;color:#bcd2ce;margin:0 0 ${tr?'12px':'0'};line-height:1.6">${esc(B.method)}</p>
+        ${tr?`<div class="obreak" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))">
+          <div class="cstat"><div class="cl">Trust · home win</div><div class="cvv">${tr.home}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
+          <div class="cstat"><div class="cl">Trust · draw</div><div class="cvv">${tr.draw}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
+          <div class="cstat"><div class="cl">Trust · away win</div><div class="cvv">${tr.away}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
+          <div class="cstat"><div class="cl">Kelly fraction</div><div class="cvv">${tr.kelly}<span style="font-size:13px;color:var(--muted)">%</span></div></div>
+        </div>`:''}</div>`:''}
+      <h2 class="sec">Upcoming matches — confidence-balanced value</h2>
+      <div class="legend2"><span style="color:var(--teal)">★★★ conviction (edge × earned trust × Kelly)</span>
+        <span><b style="background:var(--amber)"></b>Model differs from market</span>
+        <span><b style="background:#3a5560"></b>In line with market</span></div>
+      ${matches}
+    </div>
+    <div id="bet-predictions" class="hide">${predictions}</div>
     <h2 class="sec">Outright winner — model vs market</h2>
     <p class="betsrc">Market column: ${esc(B.outrightNote)}. Fair odds = 1 ÷ model probability.</p>
     <div class="panel" style="padding:4px 12px 10px">
       <table class="otable"><thead><tr><th class="l">Team</th><th>Model</th><th>Fair odds</th><th>Market</th><th>Edge</th></tr></thead>
       <tbody>${B.outright.map(orow).join('')}</tbody></table></div>
     <div class="modal-bg" id="betModal"><div class="modal"><button class="mclose" aria-label="Close">✕</button><div id="betModalBody"></div></div></div>`;
+  el.querySelector('#betseg').addEventListener('click', e=>{
+    const btn=e.target.closest('button'); if(!btn) return;
+    el.querySelectorAll('#betseg button').forEach(x=>x.classList.toggle('on',x===btn));
+    el.querySelector('#bet-value').classList.toggle('hide', btn.dataset.v!=='value');
+    el.querySelector('#bet-predictions').classList.toggle('hide', btn.dataset.v!=='predictions');
+  });
   const modal = el.querySelector('#betModal'), body = el.querySelector('#betModalBody');
   el.addEventListener('click', e=>{
     if(e.target.closest('.mclose') || e.target===modal){ modal.classList.remove('open'); return; }

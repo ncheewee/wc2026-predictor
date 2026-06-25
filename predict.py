@@ -251,8 +251,16 @@ def fetch_openfootball():
     knockout = [{"num":m.get("num"),"round":m.get("round"),
                  "team1":m.get("team1"),"team2":m.get("team2")}
                 for m in mj.get("matches", []) if not m.get("group") and m.get("num")]
-    print(f"[of] groups={len(groups)} teams={len(teamset)} played_matches={played} knockout_slots={len(knockout)}")
-    return matches, groups, knockout
+    upcoming = []
+    for m in mj.get("matches", []):
+        if (m.get("score") or {}).get("ft"): continue       # already played
+        a, b = m.get("team1"), m.get("team2")
+        if a not in teamset or b not in teamset: continue    # teams not yet known (placeholder)
+        upcoming.append({"home":a,"away":b,"date":m.get("date",""),"time":m.get("time",""),
+                         "round":m.get("round") or ("Group Stage" if m.get("group") else "Knockout")})
+    upcoming.sort(key=lambda x:(x["date"],x["time"]))
+    print(f"[of] groups={len(groups)} teams={len(teamset)} played={played} knockout={len(knockout)} upcoming={len(upcoming)}")
+    return matches, groups, knockout, upcoming
 
 def synth_sample(seed=20260623):
     """Synthesise a completed group stage from BASE_ELO + noise (offline test only)."""
@@ -268,7 +276,7 @@ def synth_sample(seed=20260623):
                             "round":f"Matchday {i//2+1}"})
         md+=4
     matches.sort(key=lambda m:m["date"])
-    return matches, [(k,v) for k,v in GROUPS.items()], list(KO_TEMPLATE)
+    return matches, [(k,v) for k,v in GROUPS.items()], list(KO_TEMPLATE), []
 
 def elo_of(team):
     return BASE_ELO.get(team, DEFAULT_ELO)
@@ -277,6 +285,20 @@ def ordinal(n):
     if not n: return "—"
     if 10 <= n % 100 <= 20: return f"{n}th"
     return f"{n}{ {1:'st',2:'nd',3:'rd'}.get(n%10,'th') }".replace(" ", "")
+
+def to_sgt(date, time):
+    """Convert an openfootball 'HH:MM UTC±N' kickoff to Singapore time (UTC+8)."""
+    m = re.match(r'\s*(\d{1,2}):(\d{2})\s*UTC([+-]\d{1,2})', time or "")
+    if not m or not date:
+        return None
+    try:
+        y, mo, d = (int(x) for x in date.split("-"))
+        hh, mm, off = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        local = dt.datetime(y, mo, d, hh, mm)
+        sgt = local - dt.timedelta(hours=off) + dt.timedelta(hours=8)
+        return sgt.strftime("%a %d %b · %H:%M")
+    except Exception:
+        return None
 
 # ----------------------------------------------------------------------------- signals
 def build_signals(matches, teams):
@@ -549,7 +571,7 @@ def projected_bracket(mt, order, resolve, elo,form,h2h, finalnum, champ):
     return rounds,cpath
 
 # ----------------------------------------------------------------------------- assemble + inject
-def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None, knockout=None):
+def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None, knockout=None, upcoming=None):
     teams=[t for _,ts in groups for t in ts]
     elo,form,h2h,feed,log,snaps=build_signals(matches,teams)
     stand=standings(matches,groups)
@@ -652,6 +674,17 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None, knock
     kp=sum(1 for m in matches if not m.get("stage","").lower().startswith("group"))
     results=[[r["a"],r["b"],r["score"],("+" if r["delta"]>=0 else "")+f"{r['delta']:.1f}",
               "Elo "+("up" if r["delta"]>=0 else "down"),"up" if r["delta"]>=0 else "dn"] for r in feed[:8]]
+    # ---- forward look: model predictions for upcoming fixtures (chronological) ----
+    fixtures=[]
+    for u in (upcoming or []):
+        a,b=u["home"],u["away"]
+        if a not in elo or b not in elo: continue
+        mv=one_x_two(match_prob(a,b,elo,form,h2h)); pi=max(range(3),key=lambda i:mv[i])
+        fixtures.append({"date":u.get("date",""),"sgt":to_sgt(u.get("date",""),u.get("time","")),
+                         "round":u.get("round",""),"a":a,"b":b,
+                         "probs":[round(x*100) for x in mv],
+                         "pick":{0:a,1:"Draw",2:b}[pi],"pickIdx":pi,"pickPct":round(mv[pi]*100)})
+    fixtures=fixtures[:40]
     src="openfootball (public domain)"
     return {
       "updated":now.isoformat().replace("+00:00","Z"),
@@ -676,7 +709,7 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None, knock
                 "eloThrough":f"{gp+kp} matches ingested",
                 "checks":["fixtures + groups fetched","scores parsed","form window = last 10",
                           "H2H records linked","ratings recomputed after each result","next auto-sync ~2h"]},
-      "groups":stand,"results":results,"betting":betting,
+      "groups":stand,"results":results,"betting":betting,"fixtures":fixtures,
       "championProgress":progress,
       "performance":{"accuracy":accuracy,"correct":correct,"total":total,"draws":draws,
                      "byOutcome":by_outcome,"brier":brier,"brierBase":0.667,
@@ -701,16 +734,16 @@ def main():
     assert abs(sum(WEIGHTS.values())-1.0)<1e-9,"weights must sum to 1"
     odds_fixtures, odds_updated = [], None
     if args.sample:
-        matches,groups,knockout=synth_sample(); live=False
+        matches,groups,knockout,upcoming=synth_sample(); live=False
     else:
         res=fetch_openfootball()
         if not res:
             print("WARNING: openfootball unavailable — deploying synthesised seed data.")
-            matches,groups,knockout=synth_sample(); live=False
+            matches,groups,knockout,upcoming=synth_sample(); live=False
         else:
-            matches,groups,knockout=res; live=True
+            matches,groups,knockout,upcoming=res; live=True
             odds_fixtures, odds_updated = fetch_odds()
-    data=assemble(matches,groups,live,odds_fixtures,odds_updated,knockout)
+    data=assemble(matches,groups,live,odds_fixtures,odds_updated,knockout,upcoming)
     if args.dump: json.dump(data,open(args.dump,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
     inject(args.out,data)
     print(f"OK · champion {data['champion']['team']} {data['champion']['prob']}% · "
