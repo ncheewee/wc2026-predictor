@@ -717,7 +717,7 @@ function renderBetting(){
     </div>`;
   });
   const predictions = pred
-    ? `<p class="betsrc">The forward look — model's pick for every upcoming fixture (kickoffs SGT), with Singapore Pools odds. Tick <b style="color:var(--teal)">hit</b> / <b style="color:var(--red)">miss</b> to simulate a day's bets — tally = sum of winning odds − 1 per miss (1 unit/bet). Saved in your browser. Mirrors the <a data-goto="scorecard" href="#">Scorecard</a>.</p>
+    ? `<p class="betsrc">The forward look — model's pick for every upcoming fixture (kickoffs SGT), with Singapore Pools odds. Tick <b style="color:var(--teal)">hit</b> / <b style="color:var(--red)">miss</b> to simulate a day's bets — net profit at 1 unit/bet: a hit returns its odds (profit = odds − 1), a miss loses the stake (−1). Saved in your browser. Mirrors the <a data-goto="scorecard" href="#">Scorecard</a>.</p>
        <div class="legend2"><span><b style="background:var(--teal)"></b>Home win</span><span><b style="background:#3a5560"></b>Draw</span><span><b style="background:var(--sky)"></b>Away win</span></div>${pred}`
     : `<div class="panel"><div class="empty"><div class="ei">◌</div><p><b>No upcoming fixtures with confirmed teams.</b></p><p>Predictions appear here for scheduled matches once both teams are known.</p></div></div>`;
   el.innerHTML = `
@@ -760,7 +760,7 @@ function renderBetting(){
   function recalcDay(day){
     let tally=0,hit=0,miss=0;
     el.querySelectorAll(dsel(day)).forEach(r=>{ const s=getS(r.dataset.id);
-      if(s==='hit'){ tally+=parseFloat(r.dataset.odds)||0; hit++; }
+      if(s==='hit'){ tally+=(parseFloat(r.dataset.odds)||0)-1; hit++; }   // net profit = odds − stake
       else if(s==='miss'){ tally-=1; miss++; } });
     const t=el.querySelector('.daytally[data-day="'+(window.CSS&&CSS.escape?CSS.escape(day):day)+'"]');
     if(t) t.innerHTML=(hit||miss)
