@@ -28,7 +28,11 @@ Simplifications (kept honest, see the Methodology tab):
 """
 
 import argparse, json, math, os, random, re, sys, datetime as dt
-import urllib.request
+import urllib.request, unicodedata
+
+def _norm(s):
+    """Accent/case-fold a team name for matching across data sources (Curaçao=Curacao)."""
+    return unicodedata.normalize("NFKD", s or "").encode("ascii","ignore").decode().lower().strip()
 
 # ----------------------------------------------------------------------------- config
 WEIGHTS = {"elo": 0.45, "form": 0.35, "h2h": 0.20}   # must sum to 1.0
@@ -573,6 +577,9 @@ def projected_bracket(mt, order, resolve, elo,form,h2h, finalnum, champ):
 # ----------------------------------------------------------------------------- assemble + inject
 def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None, knockout=None, upcoming=None):
     teams=[t for _,ts in groups for t in ts]
+    # reconcile odds team names to canonical (openfootball) names, accent-insensitive
+    canon={_norm(t):t for t in teams}
+    odds_fixtures=[(canon.get(_norm(a),a), canon.get(_norm(b),b), o) for a,b,o in (odds_fixtures or [])]
     elo,form,h2h,feed,log,snaps=build_signals(matches,teams)
     stand=standings(matches,groups)
     # ---- data-driven reliability (earned trust) for confidence-balanced betting ----
