@@ -675,15 +675,24 @@ def assemble(matches, groups, live, odds_fixtures=None, odds_updated=None, knock
     results=[[r["a"],r["b"],r["score"],("+" if r["delta"]>=0 else "")+f"{r['delta']:.1f}",
               "Elo "+("up" if r["delta"]>=0 else "down"),"up" if r["delta"]>=0 else "dn"] for r in feed[:8]]
     # ---- forward look: model predictions for upcoming fixtures (chronological) ----
+    odds_map={}
+    for oa,ob,oo in (odds_fixtures or []):
+        odds_map[frozenset((oa,ob))]=(oa,ob,oo)
     fixtures=[]
     for u in (upcoming or []):
         a,b=u["home"],u["away"]
         if a not in elo or b not in elo: continue
         mv=one_x_two(match_prob(a,b,elo,form,h2h)); pi=max(range(3),key=lambda i:mv[i])
+        od=None; pe=odds_map.get(frozenset((a,b)))
+        if pe:
+            oa,_,oo=pe
+            od=list(oo) if oa==a else [oo[2],oo[1],oo[0]]   # orient so index 0 = team a (home)
         fixtures.append({"date":u.get("date",""),"sgt":to_sgt(u.get("date",""),u.get("time","")),
                          "round":u.get("round",""),"a":a,"b":b,
                          "probs":[round(x*100) for x in mv],
-                         "pick":{0:a,1:"Draw",2:b}[pi],"pickIdx":pi,"pickPct":round(mv[pi]*100)})
+                         "pick":{0:a,1:"Draw",2:b}[pi],"pickIdx":pi,"pickPct":round(mv[pi]*100),
+                         "odds":[round(x,2) for x in od] if od else None,
+                         "pickOdds":round(od[pi],2) if od else None})
     fixtures=fixtures[:40]
     src="openfootball (public domain)"
     return {

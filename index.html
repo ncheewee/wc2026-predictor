@@ -215,6 +215,15 @@
   .fxp{text-align:right;font-size:12.5px;color:var(--muted);white-space:nowrap}.fxp b{color:var(--teal);font-weight:600}
   .fxbar{grid-column:1/-1;display:flex;height:6px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.05);margin-top:2px}
   .fxbar i{display:block;height:100%}
+  .fxp .odd{color:var(--ink);font-weight:600;margin-left:6px}
+  .betsim{grid-column:1/-1;display:flex;gap:6px;margin-top:9px}
+  .bchip{font-family:var(--disp);font-size:10.5px;letter-spacing:.03em;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:20px;padding:4px 12px;cursor:pointer}
+  .bchip.act[data-s="hit"]{background:var(--teal);color:var(--bg);border-color:var(--teal);font-weight:700}
+  .bchip.act[data-s="miss"]{background:var(--red);color:#fff;border-color:var(--red);font-weight:700}
+  .bchip.act[data-s=""]{background:rgba(255,255,255,.1);color:var(--ink)}
+  .fxday{display:flex;align-items:baseline;justify-content:space-between}
+  .daytally{font-family:var(--sans);font-size:12.5px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)}
+  .daytally b{font-family:var(--disp)}
   .otable{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
   .otable th{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);
     font-weight:400;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
@@ -687,20 +696,28 @@ function renderBetting(){
   const tr = B.trust;
   // forward-look predictions list (chronological, grouped by day)
   const FX = DATA.fixtures || [];
-  let pred='', curDay='';
+  let pred='', curDate='';
   FX.forEach(f=>{
     const day=(f.sgt||'').split('·')[0].trim(), time=((f.sgt||'').split('·')[1]||'').trim();
-    if(day && day!==curDay){ curDay=day; pred+=`<div class="fxday">${esc(day)}</div>`; }
-    pred+=`<div class="fxrow">
+    if(f.date!==curDate){ curDate=f.date;
+      pred+=`<div class="fxday"><span>${esc(day||f.date)}</span><span class="daytally" data-day="${esc(f.date)}"></span></div>`; }
+    const id=f.date+'|'+f.a+'|'+f.b;
+    const oddTxt=f.pickOdds?`<span class="odd">@ ${f.pickOdds}</span>`:'';
+    const sim=f.pickOdds?`<div class="betsim" data-id="${esc(id)}">
+        <button class="bchip" data-s="">— no bet</button>
+        <button class="bchip" data-s="hit">✓ hit</button>
+        <button class="bchip" data-s="miss">✗ miss</button></div>`:'';
+    pred+=`<div class="fxrow" data-id="${esc(id)}" data-day="${esc(f.date)}" data-odds="${f.pickOdds||0}">
       <div class="fxt">${esc(time||'—')}</div>
       <div class="fxm"><b>${esc(f.a)}</b><span>v</span><b>${esc(f.b)}</b></div>
-      <div class="fxp">${esc(f.pick)} <b>${f.pickPct}%</b></div>
+      <div class="fxp">${esc(f.pick)} <b>${f.pickPct}%</b>${oddTxt}</div>
       <div class="fxbar" title="${esc(f.a)} ${f.probs[0]}% · Draw ${f.probs[1]}% · ${esc(f.b)} ${f.probs[2]}%">
         <i style="width:${f.probs[0]}%;background:var(--teal)"></i><i style="width:${f.probs[1]}%;background:#3a5560"></i><i style="width:${f.probs[2]}%;background:var(--sky)"></i></div>
+      ${sim}
     </div>`;
   });
   const predictions = pred
-    ? `<p class="betsrc">The forward look — the model's most-likely outcome for every upcoming fixture (kickoffs in SGT). The live counterpart to the <a data-goto="scorecard" href="#">Scorecard</a>'s past hits &amp; misses.</p>
+    ? `<p class="betsrc">The forward look — model's pick for every upcoming fixture (kickoffs SGT), with Singapore Pools odds. Tick <b style="color:var(--teal)">hit</b> / <b style="color:var(--red)">miss</b> to simulate a day's bets — tally = sum of winning odds − 1 per miss (1 unit/bet). Saved in your browser. Mirrors the <a data-goto="scorecard" href="#">Scorecard</a>.</p>
        <div class="legend2"><span><b style="background:var(--teal)"></b>Home win</span><span><b style="background:#3a5560"></b>Draw</span><span><b style="background:var(--sky)"></b>Away win</span></div>${pred}`
     : `<div class="panel"><div class="empty"><div class="ei">◌</div><p><b>No upcoming fixtures with confirmed teams.</b></p><p>Predictions appear here for scheduled matches once both teams are known.</p></div></div>`;
   el.innerHTML = `
@@ -735,6 +752,28 @@ function renderBetting(){
     el.querySelector('#bet-value').classList.toggle('hide', btn.dataset.v!=='value');
     el.querySelector('#bet-predictions').classList.toggle('hide', btn.dataset.v!=='predictions');
   });
+  // ---- daily bet simulator (persisted in browser) ----
+  const bkey = id => 'wc26bet:'+id;
+  const getS = id => { try{ return localStorage.getItem(bkey(id))||''; }catch(e){ return ''; } };
+  const setS = (id,s) => { try{ s?localStorage.setItem(bkey(id),s):localStorage.removeItem(bkey(id)); }catch(e){} };
+  const dsel = d => '.fxrow[data-day="'+(window.CSS&&CSS.escape?CSS.escape(d):d)+'"]';
+  function recalcDay(day){
+    let tally=0,hit=0,miss=0;
+    el.querySelectorAll(dsel(day)).forEach(r=>{ const s=getS(r.dataset.id);
+      if(s==='hit'){ tally+=parseFloat(r.dataset.odds)||0; hit++; }
+      else if(s==='miss'){ tally-=1; miss++; } });
+    const t=el.querySelector('.daytally[data-day="'+(window.CSS&&CSS.escape?CSS.escape(day):day)+'"]');
+    if(t) t.innerHTML=(hit||miss)
+      ? `${hit} hit · ${miss} miss → <b style="color:${tally>=0?'var(--teal)':'var(--red)'}">${tally>=0?'+':''}${tally.toFixed(2)}</b> units`
+      : '<span style="color:var(--faint)">no bets yet</span>';
+  }
+  el.querySelectorAll('.betsim').forEach(sim=>{ const s=getS(sim.dataset.id);
+    sim.querySelectorAll('.bchip').forEach(c=>c.classList.toggle('act',c.dataset.s===s)); });
+  el.querySelectorAll('.daytally').forEach(t=>recalcDay(t.dataset.day));
+  el.addEventListener('click', e=>{ const chip=e.target.closest('.bchip'); if(!chip) return;
+    const sim=chip.closest('.betsim'); setS(sim.dataset.id, chip.dataset.s);
+    sim.querySelectorAll('.bchip').forEach(c=>c.classList.toggle('act',c===chip));
+    recalcDay(chip.closest('.fxrow').dataset.day); });
   const modal = el.querySelector('#betModal'), body = el.querySelector('#betModalBody');
   el.addEventListener('click', e=>{
     if(e.target.closest('.mclose') || e.target===modal){ modal.classList.remove('open'); return; }
