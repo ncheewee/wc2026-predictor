@@ -759,7 +759,15 @@ def main():
         else:
             matches,groups,knockout,upcoming=res; live=True
             odds_fixtures, odds_updated = fetch_odds()
-    data=assemble(matches,groups,live,odds_fixtures,odds_updated,knockout,upcoming)
+    try:
+        data=assemble(matches,groups,live,odds_fixtures,odds_updated,knockout,upcoming)
+    except Exception as e:
+        # never let an upstream-data surprise fail the build (and thus the deploy):
+        # fall back to a clearly-labelled synthesised page.
+        print(f"WARNING: live build failed ({e!r}); falling back to synthesised seed data.")
+        import traceback; traceback.print_exc()
+        m2,g2,k2,u2=synth_sample()
+        data=assemble(m2,g2,False,[],None,k2,u2)
     if args.dump: json.dump(data,open(args.dump,"w",encoding="utf-8"),ensure_ascii=False,indent=2)
     inject(args.out,data)
     print(f"OK · champion {data['champion']['team']} {data['champion']['prob']}% · "

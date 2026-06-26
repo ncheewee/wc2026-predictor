@@ -1,7 +1,8 @@
 name: Refresh World Cup 2026 prediction
 
 # Rebuilds index.html with fresh predictions and deploys it to GitHub Pages.
-# Runs every ~2 hours, and can be triggered manually from the Actions tab.
+# Tries every 30 min (GitHub throttles frequent crons, so expect ~hourly in practice);
+# also runs on push and on manual dispatch from the Actions tab.
 
 on:
   schedule:
@@ -16,14 +17,16 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one deployment at a time; don't pile up queued runs
+# One refresh at a time; a newer run supersedes an in-flight one instead of
+# colliding on the Pages deployment (the main cause of transient deploy failures).
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 10            # never hang a stuck run
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -50,6 +53,11 @@ jobs:
         with:
           path: _site
 
+      # More tolerant polling so a flaky Pages backend doesn't fail the run on a blip.
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 600000          # wait up to 10 min for the deployment
+          error_count: 15          # tolerate more transient backend errors before giving up
+          reporting_interval: 5000
