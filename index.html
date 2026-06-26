@@ -327,7 +327,7 @@
       <div class="node-logo"><span></span><span></span><span></span></div>
       <div><h1>WC 2026 · PREDICTION NET</h1><p id="brand-sub">Elo + form + head-to-head → Monte Carlo</p></div>
     </div>
-    <div class="status"><span class="dot"></span><span id="updated">—</span><button class="btn" id="refresh">↻ Refresh</button></div>
+    <div class="status"><span class="dot"></span><span id="updated">—</span></div>
   </header>
 
   <div class="tabs" id="tabs">
@@ -439,7 +439,7 @@ const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const ordinal = n => !n ? '—' : ((n%100>=10&&n%100<=20) ? n+'th' : n+({1:'st',2:'nd',3:'rd'}[n%10]||'th'));
 
 /* header + banner */
-document.getElementById('updated').textContent = 'Updated ' + (DATA.ingest?.ago || 'recently');
+document.getElementById('updated').textContent = 'Data refreshed ' + (DATA.ingest?.lastFetch || 'recently');
 document.getElementById('seed-banner').style.display = DATA.isSeed ? '' : 'none';
 document.getElementById('seed-banner').innerHTML = '⚠ Illustrative seed data — design/build preview, not a live prediction.';
 document.getElementById('footer').textContent =
@@ -931,12 +931,6 @@ document.getElementById('tabs').addEventListener('click',e=>{
 document.addEventListener('click',e=>{
   const g = e.target.closest('[data-goto]'); if(g){e.preventDefault();show(g.dataset.goto);}
 });
-document.getElementById('refresh').addEventListener('click',()=>{
-  const u=new URL(location.href); u.searchParams.set('t',Date.now()); location.replace(u.toString());
-});
-document.getElementById('refresh').title =
-  'Reloads the latest published build. Fresh results are recomputed by the scheduled job every ~2 hours.';
-
 renderOverview(); renderBracket(); renderScorecard(); renderData(); renderBetting(); renderMethodology();
 </script>
 </body>
