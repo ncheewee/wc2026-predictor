@@ -275,6 +275,8 @@
   .verdict{font-family:var(--disp);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
   .verdict.ok{color:var(--bg);background:var(--teal)}
   .verdict.no{color:var(--red);background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.4)}
+  .sctable .dayhdr td{font-family:var(--disp);font-size:12px;letter-spacing:.06em;color:var(--sky);padding:15px 10px 6px;border-bottom:1px solid var(--line);white-space:normal}
+  .sctable .dayhdr:first-child td{padding-top:4px}
   /* champion progress (overview) */
   .cprog{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:4px 0 14px}
   .cstat{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
@@ -437,6 +439,10 @@ const DATA = JSON.parse(document.getElementById('prediction-data').textContent);
 const conf = p => p>=70?'hi':(p>=58?'md':'lo');
 const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const ordinal = n => !n ? '—' : ((n%100>=10&&n%100<=20) ? n+'th' : n+({1:'st',2:'nd',3:'rd'}[n%10]||'th'));
+const _MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const _DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const dlabel = iso => { const p=(iso||'').split('-').map(Number); if(!p[0]) return iso||'—';
+  const d=new Date(Date.UTC(p[0],p[1]-1,p[2])); return `${_DOW[d.getUTCDay()]} ${p[2]} ${_MON[p[1]-1]} ${p[0]}`; };
 
 /* header + banner */
 document.getElementById('updated').textContent = 'Data refreshed ' + (DATA.ingest?.lastFetch || 'recently');
@@ -880,12 +886,15 @@ function renderScorecard(){
       summary=`<b>${esc(P.champion)}</b> weren't always favourite — as low as ${ordinal(worst.champRank)}, behind ${esc(worst.leader)}, around ${esc(worst.stage)} — before climbing to lead at ${cur.champProb}%.`; }
   }
   const top3=evo.length?evo[evo.length-1].top3:[];
-  const rows=(P.matches||[]).map(m=>`<tr>
-    <td>${esc(m.date)}</td>
-    <td class="fix">${esc(m.a)} <span style="color:var(--faint)">v</span> ${esc(m.b)}</td>
-    <td class="sc-pred">${esc(m.pred)} · ${m.conf}%</td>
-    <td><span class="res">${esc(m.score)}</span><span class="rname">${esc(m.result)}</span></td>
-    <td class="c"><span class="verdict ${m.correct?'ok':'no'}">${m.correct?'✓':'✗'}</span></td></tr>`).join('');
+  let rows='', _cd='';
+  (P.matches||[]).forEach(m=>{
+    if(m.date!==_cd){ _cd=m.date; rows+=`<tr class="dayhdr"><td colspan="4">${esc(dlabel(m.date))}</td></tr>`; }
+    rows+=`<tr>
+      <td class="fix">${esc(m.a)} <span style="color:var(--faint)">v</span> ${esc(m.b)}</td>
+      <td class="sc-pred">${esc(m.pred)} · ${m.conf}%</td>
+      <td><span class="res">${esc(m.score)}</span><span class="rname">${esc(m.result)}</span></td>
+      <td class="c"><span class="verdict ${m.correct?'ok':'no'}">${m.correct?'✓':'✗'}</span></td></tr>`;
+  });
   el.innerHTML=`
     <div class="metrics">
       <div class="metric"><div class="ml">Prediction accuracy</div><div class="mv">${P.accuracy}<small>%</small></div><div class="ms">${P.correct}/${P.total} correct (1 · X · 2)</div></div>
@@ -912,8 +921,8 @@ function renderScorecard(){
     <p class="betsrc">Graded the moment each match finishes — newest first. "Correct" = the model's most-likely outcome matched the actual 1·X·2 result.</p>
     <div class="panel" style="padding:4px 10px 8px">
       <table class="sctable">
-      <colgroup><col style="width:13%"><col style="width:33%"><col style="width:24%"><col style="width:20%"><col style="width:10%"></colgroup>
-      <thead><tr><th>Date</th><th>Match</th><th>Model pick</th><th>Result</th><th class="c">Call</th></tr></thead>
+      <colgroup><col style="width:40%"><col style="width:26%"><col style="width:22%"><col style="width:12%"></colgroup>
+      <thead><tr><th>Match</th><th>Model pick</th><th>Result</th><th class="c">Call</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`;
 }
 
